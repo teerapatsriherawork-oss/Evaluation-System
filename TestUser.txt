@@ -1,0 +1,11 @@
+admin (HR)
+User : admin
+Pass : admin123
+
+กรรมการตัวอย่าง
+User : committee1
+Pass : test1234
+
+ผู้รับการประเมินตัวอย่าง
+User : evaluatee1
+Pass : test1234
