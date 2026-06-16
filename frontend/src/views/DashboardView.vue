@@ -3,7 +3,7 @@
     <div class="d-flex align-center mb-6">
       <div>
         <h1 class="text-h4 font-weight-bold gradient-text">แดชบอร์ด</h1>
-        <p class="text-body-2 text-medium-emphasis mt-1">สวัสดี, {{ auth.userName }} — {{ roleLabel }}</p>
+        <p class="text-body-2 text-medium-emphasis mt-1">สวัสดี, {{ auth.userName }} — {{ roleLabel(auth.userRole) }}</p>
       </div>
       <v-spacer />
       <v-chip color="success" variant="tonal" v-if="activePeriod" prepend-icon="mdi-calendar-check">
@@ -38,28 +38,15 @@
               <span class="text-h6 font-weight-medium">รอบประเมินล่าสุด</span>
             </div>
             <v-table density="comfortable" class="bg-transparent">
-              <thead>
-                <tr>
-                  <th>ชื่อรอบประเมิน</th>
-                  <th>วันเริ่มต้น</th>
-                  <th>วันสิ้นสุด</th>
-                  <th>สถานะ</th>
-                </tr>
-              </thead>
+              <thead><tr><th>ชื่อรอบประเมิน</th><th>วันเริ่มต้น</th><th>วันสิ้นสุด</th><th>สถานะ</th></tr></thead>
               <tbody>
                 <tr v-for="p in periods" :key="p.id">
                   <td>{{ p.title }}</td>
                   <td>{{ formatDate(p.start_date) }}</td>
                   <td>{{ formatDate(p.end_date) }}</td>
-                  <td>
-                    <v-chip :color="p.is_active ? 'success' : 'grey'" size="small" label>
-                      {{ p.is_active ? 'เปิด' : 'ปิด' }}
-                    </v-chip>
-                  </td>
+                  <td><v-chip :color="p.is_active ? 'success' : 'grey'" size="small" label>{{ p.is_active ? 'เปิด' : 'ปิด' }}</v-chip></td>
                 </tr>
-                <tr v-if="periods.length === 0">
-                  <td colspan="4" class="text-center text-medium-emphasis py-4">ยังไม่มีรอบประเมิน</td>
-                </tr>
+                <tr v-if="periods.length === 0"><td colspan="4" class="text-center text-medium-emphasis py-4">ยังไม่มีรอบประเมิน</td></tr>
               </tbody>
             </v-table>
           </v-card>
@@ -126,37 +113,20 @@
               <span class="text-h6 font-weight-medium">รายการที่ต้องประเมิน</span>
             </div>
             <v-table density="comfortable" class="bg-transparent">
-              <thead>
-                <tr>
-                  <th>ผู้รับการประเมิน</th>
-                  <th>แผนก</th>
-                  <th>บทบาท</th>
-                  <th>สถานะ</th>
-                  <th>ดำเนินการ</th>
-                </tr>
-              </thead>
+              <thead><tr><th>ผู้รับการประเมิน</th><th>แผนก</th><th>บทบาท</th><th>สถานะ</th><th>ดำเนินการ</th></tr></thead>
               <tbody>
                 <tr v-for="a in assignments" :key="a.id">
                   <td>{{ a.evaluatee_name }}</td>
                   <td>{{ a.department }}</td>
-                  <td>
-                    <v-chip size="x-small" :color="a.committee_role === 'chairman' ? 'warning' : 'info'" label>
-                      {{ a.committee_role === 'chairman' ? 'ประธาน' : 'กรรมการ' }}
-                    </v-chip>
-                  </td>
-                  <td>
-                    <v-chip size="x-small" :color="statusColor(a.status)" label>{{ statusLabel(a.status) }}</v-chip>
-                  </td>
+                  <td><v-chip size="x-small" :color="a.committee_role === 'chairman' ? 'warning' : 'info'" label>{{ a.committee_role === 'chairman' ? 'ประธาน' : 'กรรมการ' }}</v-chip></td>
+                  <td><StatusChip :status="a.status" /></td>
                   <td>
                     <v-btn size="small" color="primary" variant="tonal" :to="`/committee/score/${a.id}`" rounded="lg">
-                      <v-icon start size="small">mdi-pencil</v-icon>
-                      {{ a.status === 'completed' ? 'ดูผล' : 'ประเมิน' }}
+                      <v-icon start size="small">mdi-pencil</v-icon>{{ a.status === 'completed' ? 'ดูผล' : 'ประเมิน' }}
                     </v-btn>
                   </td>
                 </tr>
-                <tr v-if="assignments.length === 0">
-                  <td colspan="5" class="text-center text-medium-emphasis py-4">ยังไม่มีรายการประเมิน</td>
-                </tr>
+                <tr v-if="assignments.length === 0"><td colspan="5" class="text-center text-medium-emphasis py-4">ยังไม่มีรายการประเมิน</td></tr>
               </tbody>
             </v-table>
           </v-card>
@@ -168,17 +138,15 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useAuthStore, api } from '../stores/auth'
+import { useAuthStore } from '../stores/auth'
+import { api } from '../lib/api'
+import { formatDate, roleLabel } from '../lib/format'
+import StatusChip from '../components/StatusChip.vue'
 
 const auth = useAuthStore()
 const periods = ref([])
 const assignments = ref([])
 const progress = ref({ total: 0, completed: 0, draft: 0, remaining: 0, progress: 0 })
-
-const roleLabel = computed(() => {
-  const m = { hr: 'ฝ่ายบุคลากร', evaluatee: 'ผู้รับการประเมิน', committee: 'กรรมการผู้ประเมิน' }
-  return m[auth.userRole] || ''
-})
 
 const activePeriod = computed(() => periods.value.find(p => p.is_active))
 
@@ -203,24 +171,11 @@ const stats = computed(() => {
   ]
 })
 
-const formatDate = d => d ? new Date(d).toLocaleDateString('th-TH') : '-'
-const statusColor = s => ({ pending: 'grey', in_progress: 'warning', completed: 'success' }[s] || 'grey')
-const statusLabel = s => ({ pending: 'รอดำเนินการ', in_progress: 'กำลังประเมิน', completed: 'เสร็จสิ้น' }[s] || s)
-
 onMounted(async () => {
   try {
-    if (auth.isHR) {
-      const { data } = await api.get('/evaluations')
-      periods.value = data.data || []
-    }
-    if (auth.isEvaluatee) {
-      const { data } = await api.get(`/self-assessments/progress/${auth.user.id}`)
-      progress.value = data.data || progress.value
-    }
-    if (auth.isCommittee) {
-      const { data } = await api.get(`/assignments/committee/${auth.user.id}`)
-      assignments.value = data.data || []
-    }
+    if (auth.isHR) periods.value = (await api.get('/evaluations')).data.data || []
+    if (auth.isEvaluatee) progress.value = (await api.get(`/self-assessments/progress/${auth.user.id}`)).data.data || progress.value
+    if (auth.isCommittee) assignments.value = (await api.get(`/assignments/committee/${auth.user.id}`)).data.data || []
   } catch (e) { console.error(e) }
 })
 </script>

@@ -1,2 +1,19 @@
 **/node_modules/
 node_modules/
+
+# env (ห้าม commit ความลับ เช่น JWT_SECRET, DB_PASSWORD)
+.env
+**/.env
+
+# uploads
+backend/uploads/
+
+# logs
+*.log
+
+# yarn berry (cache/install-state — commit เฉพาะ yarn.lock + .yarnrc.yml)
+.yarn/
+.pnp.*
+
+# OS
+.DS_Store

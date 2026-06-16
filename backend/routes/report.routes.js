@@ -15,6 +15,9 @@ router.get('/statistics/:periodId', auth, authorize('hr'), ctrl.getStatistics);
 /** GET /api/reports/tracking/:periodId — ติดตามสถานะ */
 router.get('/tracking/:periodId', auth, authorize('hr'), ctrl.getTracking);
 
+/** GET /api/reports/pdf/:evaluateeId — ออกรายงานรายบุคคลเป็น PDF */
+router.get('/pdf/:evaluateeId', auth, ctrl.exportPdf);
+
 /** POST /api/backup — สำรองข้อมูล (HR) */
 router.post('/backup', auth, authorize('hr'), ctrl.createBackup);
 

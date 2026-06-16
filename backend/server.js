@@ -9,6 +9,7 @@ const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const path = require('path');
+const { fail } = require('./utils/response');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -42,41 +43,16 @@ app.get('/api/health', (req, res) => {
 });
 
 // ============ Global Error Handler ============
+// controller ทุกตัวห่อด้วย wrap() → error เด้งมารวมที่นี่จุดเดียว
 app.use((err, req, res, next) => {
   console.error('Global error:', err);
-
-  // Multer errors
-  if (err.code === 'LIMIT_FILE_SIZE') {
-    return res.status(400).json({
-      status: 'error',
-      message: 'ไฟล์มีขนาดใหญ่เกินไป (สูงสุด 10MB)',
-      data: null
-    });
-  }
-
-  if (err.message && err.message.includes('ไม่รองรับประเภทไฟล์')) {
-    return res.status(400).json({
-      status: 'error',
-      message: err.message,
-      data: null
-    });
-  }
-
-  res.status(500).json({
-    status: 'error',
-    message: 'เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์',
-    data: null
-  });
+  if (err.code === 'LIMIT_FILE_SIZE') return fail(res, 400, 'ไฟล์มีขนาดใหญ่เกินไป (สูงสุด 10MB)');
+  if (err.message?.includes('ไม่รองรับประเภทไฟล์')) return fail(res, 400, err.message);
+  fail(res, err.status || 500, err.status ? err.message : 'เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์');
 });
 
 // ============ 404 Handler ============
-app.use((req, res) => {
-  res.status(404).json({
-    status: 'error',
-    message: `ไม่พบ Route: ${req.method} ${req.originalUrl}`,
-    data: null
-  });
-});
+app.use((req, res) => fail(res, 404, `ไม่พบ Route: ${req.method} ${req.originalUrl}`));
 
 // ============ Start Server ============
 app.listen(PORT, () => {

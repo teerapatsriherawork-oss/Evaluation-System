@@ -31,17 +31,23 @@
       </v-col>
     </v-row>
 
-    <v-card v-if="feedbacks.length===0 && !loading" class="glass-card pa-10 text-center">
-      <v-icon size="64" color="info" class="mb-3">mdi-comment-text-outline</v-icon>
-      <h3 class="text-h5 mb-2">ยังไม่มีผลประเมิน</h3>
-      <p class="text-medium-emphasis">รอกรรมการส่งผลการประเมิน</p>
-    </v-card>
+    <EmptyState v-if="feedbacks.length===0 && !loading" icon="mdi-comment-text-outline"
+      title="ยังไม่มีผลประเมิน" subtitle="รอกรรมการส่งผลการประเมิน" />
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { useAuthStore, api } from '../../stores/auth'
-const auth = useAuthStore(); const feedbacks = ref([]); const loading = ref(true)
-onMounted(async () => { try { const { data } = await api.get(`/scores/feedback/${auth.user.id}`); feedbacks.value = data.data || [] } catch(e){} finally { loading.value = false } })
+import { useAuthStore } from '../../stores/auth'
+import { api } from '../../lib/api'
+import EmptyState from '../../components/EmptyState.vue'
+
+const auth = useAuthStore()
+const feedbacks = ref([])
+const loading = ref(true)
+
+onMounted(async () => {
+  try { feedbacks.value = (await api.get(`/scores/feedback/${auth.user.id}`)).data.data || [] }
+  catch (e) { /* noop */ } finally { loading.value = false }
+})
 </script>

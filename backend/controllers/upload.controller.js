@@ -1,119 +1,59 @@
 /**
- * Upload Controller
- * จัดการอัปโหลดไฟล์ (multer)
+ * Upload Controller — อัปโหลด/ลบไฟล์ (multer)
  */
 const path = require('path');
 const fs = require('fs');
 const db = require('../config/db');
+const wrap = require('../utils/handler');
+const { ok, created, fail, notFound } = require('../utils/response');
 
-// POST /api/upload — อัปโหลดไฟล์
-exports.uploadFile = async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ status: 'error', message: 'กรุณาเลือกไฟล์', data: null });
-    }
-
-    const { originalname, filename, mimetype, size } = req.file;
-
-    // บันทึกข้อมูลไฟล์ลง DB
-    const [result] = await db.query(
-      `INSERT INTO uploaded_files (user_id, original_name, file_path, file_type, file_size)
-       VALUES (?, ?, ?, ?, ?)`,
-      [req.user.id, originalname, filename, mimetype, size]
-    );
-
-    res.status(201).json({
-      status: 'success',
-      message: 'อัปโหลดไฟล์สำเร็จ',
-      data: {
-        id: result.insertId,
-        original_name: originalname,
-        file_path: `/api/uploads/${filename}`,
-        file_type: mimetype,
-        file_size: size
-      }
-    });
-  } catch (error) {
-    console.error('Upload error:', error);
-    res.status(500).json({ status: 'error', message: 'เกิดข้อผิดพลาดในการอัปโหลด', data: null });
-  }
+// บันทึก metadata ไฟล์ลง DB แล้วคืน object สำหรับ response (ใช้ทั้ง single + multiple)
+const saveFile = async (userId, file) => {
+  const result = await db.run(
+    'INSERT INTO uploaded_files (user_id, original_name, file_path, file_type, file_size) VALUES (?, ?, ?, ?, ?)',
+    [userId, file.originalname, file.filename, file.mimetype, file.size]
+  );
+  return {
+    id: result.insertId,
+    original_name: file.originalname,
+    file_path: `/api/uploads/${file.filename}`,
+    file_type: file.mimetype,
+    file_size: file.size
+  };
 };
+
+// POST /api/upload — อัปโหลดไฟล์เดียว
+exports.uploadFile = wrap(async (req, res) => {
+  if (!req.file) return fail(res, 400, 'กรุณาเลือกไฟล์');
+  created(res, await saveFile(req.user.id, req.file), 'อัปโหลดไฟล์สำเร็จ');
+});
 
 // POST /api/upload/multiple — อัปโหลดหลายไฟล์
-exports.uploadMultiple = async (req, res) => {
-  try {
-    if (!req.files || req.files.length === 0) {
-      return res.status(400).json({ status: 'error', message: 'กรุณาเลือกไฟล์', data: null });
-    }
+exports.uploadMultiple = wrap(async (req, res) => {
+  if (!req.files || req.files.length === 0) return fail(res, 400, 'กรุณาเลือกไฟล์');
+  const files = [];
+  for (const f of req.files) files.push(await saveFile(req.user.id, f));
+  created(res, files, `อัปโหลด ${files.length} ไฟล์สำเร็จ`);
+});
 
-    const uploadedFiles = [];
-    for (const file of req.files) {
-      const [result] = await db.query(
-        `INSERT INTO uploaded_files (user_id, original_name, file_path, file_type, file_size)
-         VALUES (?, ?, ?, ?, ?)`,
-        [req.user.id, file.originalname, file.filename, file.mimetype, file.size]
-      );
-      uploadedFiles.push({
-        id: result.insertId,
-        original_name: file.originalname,
-        file_path: `/api/uploads/${file.filename}`,
-        file_type: file.mimetype,
-        file_size: file.size
-      });
-    }
+// GET /api/upload/list — รายการไฟล์ (?user_id=1)
+exports.getFiles = wrap(async (req, res) => {
+  let sql = 'SELECT * FROM uploaded_files';
+  const params = [];
+  if (req.query.user_id) { sql += ' WHERE user_id = ?'; params.push(req.query.user_id); }
+  sql += ' ORDER BY uploaded_at DESC';
+  ok(res, await db.many(sql, params));
+});
 
-    res.status(201).json({
-      status: 'success',
-      message: `อัปโหลด ${uploadedFiles.length} ไฟล์สำเร็จ`,
-      data: uploadedFiles
-    });
-  } catch (error) {
-    console.error('Upload multiple error:', error);
-    res.status(500).json({ status: 'error', message: 'เกิดข้อผิดพลาด', data: null });
-  }
-};
+// DELETE /api/upload/:id — ลบไฟล์ (ทั้งไฟล์จริงและ record)
+exports.deleteFile = wrap(async (req, res) => {
+  const file = await db.one('SELECT * FROM uploaded_files WHERE id = ?', [req.params.id]);
+  if (!file) return notFound(res, 'ไม่พบไฟล์');
 
-// GET /api/upload/list — รายการไฟล์ที่อัปโหลด
-exports.getFiles = async (req, res) => {
-  try {
-    let query = 'SELECT * FROM uploaded_files';
-    const params = [];
-    if (req.query.user_id) {
-      query += ' WHERE user_id = ?';
-      params.push(req.query.user_id);
-    }
-    query += ' ORDER BY uploaded_at DESC';
-    const [rows] = await db.query(query, params);
-    res.json({ status: 'success', message: 'ดึงข้อมูลสำเร็จ', data: rows });
-  } catch (error) {
-    console.error('GetFiles error:', error);
-    res.status(500).json({ status: 'error', message: 'เกิดข้อผิดพลาด', data: null });
-  }
-};
+  const filePath = path.join(__dirname, '..', 'uploads', file.file_path);
+  try { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); }
+  catch (e) { console.warn('Could not delete physical file:', e.message); }
 
-// DELETE /api/upload/:id — ลบไฟล์
-exports.deleteFile = async (req, res) => {
-  try {
-    const [files] = await db.query('SELECT * FROM uploaded_files WHERE id = ?', [req.params.id]);
-    if (files.length === 0) {
-      return res.status(404).json({ status: 'error', message: 'ไม่พบไฟล์', data: null });
-    }
-
-    // ลบไฟล์จริง (file_path เก็บเป็น filename เช่น 1234567890-123.pdf)
-    const filePath = path.join(__dirname, '..', 'uploads', files[0].file_path);
-    try {
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
-    } catch (fsErr) {
-      console.warn('Could not delete physical file:', fsErr.message);
-    }
-
-    // ลบจาก DB
-    await db.query('DELETE FROM uploaded_files WHERE id = ?', [req.params.id]);
-    res.json({ status: 'success', message: 'ลบไฟล์สำเร็จ', data: null });
-  } catch (error) {
-    console.error('DeleteFile error:', error);
-    res.status(500).json({ status: 'error', message: 'เกิดข้อผิดพลาด', data: null });
-  }
-};
+  await db.run('DELETE FROM uploaded_files WHERE id = ?', [req.params.id]);
+  ok(res, null, 'ลบไฟล์สำเร็จ');
+});

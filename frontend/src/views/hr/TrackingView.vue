@@ -15,7 +15,7 @@
               <tr v-for="c in tracking.committee_tracking" :key="c.committee_name">
                 <td>{{ c.committee_name }}</td>
                 <td><v-chip size="x-small" :color="c.committee_role==='chairman'?'warning':'info'" label>{{ c.committee_role==='chairman'?'ประธาน':'สมาชิก' }}</v-chip></td>
-                <td><v-chip size="x-small" :color="statusColor(c.status)" label>{{ statusLabel(c.status) }}</v-chip></td>
+                <td><StatusChip :status="c.status" /></td>
                 <td>{{ c.completed }}/{{ c.total }}</td>
               </tr>
               <tr v-if="!tracking.committee_tracking?.length"><td colspan="4" class="text-center text-medium-emphasis py-3">ไม่พบข้อมูล</td></tr>
@@ -44,10 +44,22 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { api } from '../../stores/auth'
-const periodId = ref(null); const periodItems = ref([]); const tracking = ref({})
-const statusColor = s => ({pending:'grey',in_progress:'warning',completed:'success'}[s]||'grey')
-const statusLabel = s => ({pending:'รอ',in_progress:'กำลังทำ',completed:'เสร็จ'}[s]||s)
-const fetchTracking = async () => { if (!periodId.value) return; try { const { data } = await api.get(`/reports/tracking/${periodId.value}`); tracking.value = data.data || {} } catch(e){} }
-onMounted(async () => { try { const { data } = await api.get('/evaluations'); const p = data.data||[]; periodItems.value = p.map(x=>({title:x.title,value:x.id})); if(p.length){ periodId.value=p[0].id; await fetchTracking() } } catch(e){} })
+import { api } from '../../lib/api'
+import StatusChip from '../../components/StatusChip.vue'
+
+const periodId = ref(null)
+const periodItems = ref([])
+const tracking = ref({})
+
+const fetchTracking = async () => {
+  if (!periodId.value) return
+  try { const { data } = await api.get(`/reports/tracking/${periodId.value}`); tracking.value = data.data || {} } catch (e) { /* noop */ }
+}
+
+onMounted(async () => {
+  const { data } = await api.get('/evaluations')
+  const p = data.data || []
+  periodItems.value = p.map(x => ({ title: x.title, value: x.id }))
+  if (p.length) { periodId.value = p[0].id; await fetchTracking() }
+})
 </script>

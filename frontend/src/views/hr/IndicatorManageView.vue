@@ -10,7 +10,6 @@
       <v-btn class="gradient-btn mr-2" @click="openTopicDialog()"><v-icon start>mdi-plus</v-icon> เพิ่มหัวข้อ</v-btn>
     </div>
 
-    <!-- Topics + Indicators -->
     <v-expansion-panels variant="accordion" class="mb-4">
       <v-expansion-panel v-for="topic in topics" :key="topic.id" class="glass-card mb-3" rounded="xl">
         <v-expansion-panel-title>
@@ -40,9 +39,7 @@
                     {{ ind.score_type === 'scale' ? 'สเกล 1-4' : 'มี/ไม่มี' }}
                   </v-chip>
                 </td>
-                <td>
-                  <v-chip size="x-small" color="secondary" label>{{ evidenceLabel(ind.evidence_type) }}</v-chip>
-                </td>
+                <td><v-chip size="x-small" color="secondary" label>{{ evidenceLabel(ind.evidence_type) }}</v-chip></td>
                 <td>
                   <v-btn icon size="x-small" variant="text" @click="openIndicatorDialog(topic.id, ind)"><v-icon size="small">mdi-pencil</v-icon></v-btn>
                   <v-btn icon size="x-small" variant="text" color="error" @click="deleteIndicator(ind.id)"><v-icon size="small">mdi-delete</v-icon></v-btn>
@@ -55,12 +52,15 @@
       </v-expansion-panel>
     </v-expansion-panels>
 
+    <EmptyState v-if="!topics.length" icon="mdi-folder-plus" title="ยังไม่มีหัวข้อการประเมิน"
+      subtitle="เริ่มต้นด้วยการเพิ่มหัวข้อแรก แล้วเพิ่มตัวชี้วัดในแต่ละหัวข้อ" />
+
     <!-- Topic Dialog -->
     <v-dialog v-model="topicDlg" max-width="450" persistent>
       <v-card class="glass-card pa-6" rounded="xl">
-        <v-card-title class="gradient-text font-weight-bold pa-0 mb-4">{{ topicEdit ? 'แก้ไขหัวข้อ' : 'เพิ่มหัวข้อใหม่' }}</v-card-title>
+        <v-card-title class="gradient-text font-weight-bold pa-0 mb-4">{{ topicEditId ? 'แก้ไขหัวข้อ' : 'เพิ่มหัวข้อใหม่' }}</v-card-title>
         <v-form @submit.prevent="saveTopic" ref="topicFormRef">
-          <v-text-field v-model="topicForm.title" label="ชื่อหัวข้อ *" :rules="[r=>!!r||'กรุณากรอก']" />
+          <v-text-field v-model="topicForm.title" label="ชื่อหัวข้อ *" :rules="[req]" />
           <v-textarea v-model="topicForm.description" label="รายละเอียด" rows="2" />
           <v-text-field v-model.number="topicForm.sort_order" label="ลำดับ" type="number" />
           <div class="d-flex ga-2 justify-end mt-2">
@@ -74,29 +74,29 @@
     <!-- Indicator Dialog -->
     <v-dialog v-model="indDlg" max-width="550" persistent>
       <v-card class="glass-card pa-6" rounded="xl">
-        <v-card-title class="gradient-text font-weight-bold pa-0 mb-4">{{ indEdit ? 'แก้ไขตัวชี้วัด' : 'เพิ่มตัวชี้วัดใหม่' }}</v-card-title>
+        <v-card-title class="gradient-text font-weight-bold pa-0 mb-4">{{ indEditId ? 'แก้ไขตัวชี้วัด' : 'เพิ่มตัวชี้วัดใหม่' }}</v-card-title>
         <v-form @submit.prevent="saveIndicator" ref="indFormRef">
-          <v-text-field v-model="indForm.name" label="ชื่อตัวชี้วัด *" :rules="[r=>!!r||'กรุณากรอก']" />
+          <v-text-field v-model="indForm.name" label="ชื่อตัวชี้วัด *" :rules="[req]" />
           <v-textarea v-model="indForm.description" label="รายละเอียด" rows="2" />
           <v-row dense>
             <v-col cols="4"><v-text-field v-model.number="indForm.weight" label="น้ำหนักคะแนน" type="number" step="0.01" /></v-col>
             <v-col cols="4">
-              <v-select v-model="indForm.score_type" label="รูปแบบการประเมิน" :items="[{title:'สเกล 1-4',value:'scale'},{title:'มี/ไม่มี',value:'boolean'}]" />
+              <v-select v-model="indForm.score_type" label="รูปแบบการประเมิน" :items="scoreTypeOptions" />
             </v-col>
             <v-col cols="4">
-              <v-select v-model="indForm.evidence_type" label="หลักฐาน" :items="[{title:'ไฟล์',value:'file'},{title:'URL',value:'url'},{title:'ทั้งสอง',value:'both'}]" />
+              <v-select v-model="indForm.evidence_type" label="หลักฐาน" :items="evidenceOptions" />
             </v-col>
           </v-row>
-          <!-- Scale Description -->
-          <v-alert v-if="indForm.score_type === 'scale'" type="info" variant="tonal" density="compact" class="mb-3" rounded="lg">
-            <div class="text-body-2">
-              <strong>คำอธิบายระดับคะแนน:</strong><br/>
-              ระดับ 1 — ปฏิบัติได้ต่ำกว่าระดับที่คาดหวังมาก<br/>
-              ระดับ 2 — ปฏิบัติได้ต่ำกว่าระดับที่คาดหวัง<br/>
-              ระดับ 3 — ปฏิบัติได้ตามระดับที่คาดหวัง<br/>
-              ระดับ 4 — ปฏิบัติได้สูงกว่าระดับที่คาดหวัง
+          <!-- คำอธิบายระดับคะแนน 1-4 แก้ไขได้ (เกณฑ์ 5.1.4) -->
+          <v-expand-transition>
+            <div v-if="indForm.score_type === 'scale'" class="mb-3">
+              <div class="text-body-2 font-weight-medium mb-2">
+                <v-icon size="small" color="primary" class="mr-1">mdi-information</v-icon>คำอธิบายระดับคะแนน 1-4 (แก้ไขได้)
+              </div>
+              <v-text-field v-for="(lvl, i) in indForm.score_levels" :key="i" v-model="indForm.score_levels[i]"
+                :label="`ระดับ ${i + 1}`" density="compact" variant="outlined" hide-details class="mb-2" />
             </div>
-          </v-alert>
+          </v-expand-transition>
           <div class="d-flex ga-2 justify-end">
             <v-btn variant="text" @click="indDlg=false">ยกเลิก</v-btn>
             <v-btn type="submit" class="gradient-btn" :loading="saving">บันทึก</v-btn>
@@ -108,83 +108,90 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, inject } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { api } from '../../stores/auth'
+import { api } from '../../lib/api'
+import { useNotify } from '../../composables/useNotify'
+import { DEFAULT_SCORE_LEVELS, parseScoreLevels } from '../../lib/format'
+import EmptyState from '../../components/EmptyState.vue'
 
 const route = useRoute()
-const showSnackbar = inject('showSnackbar')
+const { success, error } = useNotify()
 const periodId = route.params.periodId
 const topics = ref([])
 const saving = ref(false)
+const req = (v) => !!v || 'กรุณากรอก'
 
-// Topic
-const topicDlg = ref(false); const topicEdit = ref(false); const topicEditId = ref(null)
+const scoreTypeOptions = [{ title: 'สเกล 1-4', value: 'scale' }, { title: 'มี/ไม่มี', value: 'boolean' }]
+const evidenceOptions = [{ title: 'ไฟล์', value: 'file' }, { title: 'URL', value: 'url' }, { title: 'ทั้งสอง', value: 'both' }]
+const evidenceLabel = (t) => ({ file: 'ไฟล์', url: 'URL', both: 'ไฟล์+URL' }[t] || t)
+
+// ----- Topic -----
+const topicDlg = ref(false)
+const topicEditId = ref(null)
 const topicForm = reactive({ title: '', description: '', sort_order: 0 })
 const topicFormRef = ref(null)
 
-// Indicator
-const indDlg = ref(false); const indEdit = ref(false); const indEditId = ref(null); const indTopicId = ref(null)
-const indForm = reactive({ name: '', description: '', weight: 1, score_type: 'scale', evidence_type: 'both', sort_order: 0 })
+// ----- Indicator -----
+const indDlg = ref(false)
+const indEditId = ref(null)
+const indTopicId = ref(null)
+const indForm = reactive({ name: '', description: '', weight: 1, score_type: 'scale', evidence_type: 'both', score_levels: [...DEFAULT_SCORE_LEVELS], sort_order: 0 })
 const indFormRef = ref(null)
-
-const evidenceLabel = t => ({ file: 'ไฟล์', url: 'URL', both: 'ไฟล์+URL' }[t] || t)
 
 const fetchTopics = async () => {
   try {
     const { data } = await api.get(`/evaluations/${periodId}/topics`)
-    const topicsData = data.data || []
-    for (const t of topicsData) {
+    const list = data.data || []
+    for (const t of list) {
       const res = await api.get(`/topics/${t.id}/indicators`)
       t.indicators = res.data.data || []
     }
-    topics.value = topicsData
-  } catch (e) { console.error(e) }
+    topics.value = list
+  } catch (e) { error('โหลดข้อมูลไม่สำเร็จ') }
 }
 
 const openTopicDialog = (t = null) => {
-  if (t) { topicEdit.value = true; topicEditId.value = t.id; Object.assign(topicForm, { title: t.title, description: t.description, sort_order: t.sort_order }) }
-  else { topicEdit.value = false; topicEditId.value = null; Object.assign(topicForm, { title: '', description: '', sort_order: 0 }) }
+  topicEditId.value = t?.id ?? null
+  Object.assign(topicForm, { title: '', description: '', sort_order: 0 }, t || {})
   topicDlg.value = true
 }
-
 const saveTopic = async () => {
   const { valid } = await topicFormRef.value.validate(); if (!valid) return
   saving.value = true
   try {
-    if (topicEdit.value) await api.put(`/topics/${topicEditId.value}`, topicForm)
+    if (topicEditId.value) await api.put(`/topics/${topicEditId.value}`, topicForm)
     else await api.post(`/evaluations/${periodId}/topics`, topicForm)
-    topicDlg.value = false; await fetchTopics(); showSnackbar('บันทึกสำเร็จ')
-  } catch (e) { showSnackbar('เกิดข้อผิดพลาด', 'error') }
-  finally { saving.value = false }
+    topicDlg.value = false; await fetchTopics(); success('บันทึกสำเร็จ')
+  } catch (e) { error() } finally { saving.value = false }
 }
-
 const deleteTopic = async (id) => {
-  try { await api.delete(`/topics/${id}`); await fetchTopics(); showSnackbar('ลบสำเร็จ') }
-  catch (e) { showSnackbar('เกิดข้อผิดพลาด', 'error') }
+  try { await api.delete(`/topics/${id}`); await fetchTopics(); success('ลบสำเร็จ') } catch { error() }
 }
 
 const openIndicatorDialog = (topicId, ind = null) => {
   indTopicId.value = topicId
-  if (ind) { indEdit.value = true; indEditId.value = ind.id; Object.assign(indForm, ind) }
-  else { indEdit.value = false; indEditId.value = null; Object.assign(indForm, { name: '', description: '', weight: 1, score_type: 'scale', evidence_type: 'both', sort_order: 0 }) }
+  indEditId.value = ind?.id ?? null
+  Object.assign(indForm,
+    { name: '', description: '', weight: 1, score_type: 'scale', evidence_type: 'both', sort_order: 0 },
+    ind || {},
+    { score_levels: parseScoreLevels(ind?.score_levels) }
+  )
   indDlg.value = true
 }
-
 const saveIndicator = async () => {
   const { valid } = await indFormRef.value.validate(); if (!valid) return
   saving.value = true
+  // เก็บ score_levels เป็น JSON string เฉพาะแบบสเกล
+  const payload = { ...indForm, score_levels: indForm.score_type === 'scale' ? JSON.stringify(indForm.score_levels) : null }
   try {
-    if (indEdit.value) await api.put(`/indicators/${indEditId.value}`, indForm)
-    else await api.post(`/topics/${indTopicId.value}/indicators`, indForm)
-    indDlg.value = false; await fetchTopics(); showSnackbar('บันทึกสำเร็จ')
-  } catch (e) { showSnackbar('เกิดข้อผิดพลาด', 'error') }
-  finally { saving.value = false }
+    if (indEditId.value) await api.put(`/indicators/${indEditId.value}`, payload)
+    else await api.post(`/topics/${indTopicId.value}/indicators`, payload)
+    indDlg.value = false; await fetchTopics(); success('บันทึกสำเร็จ')
+  } catch (e) { error() } finally { saving.value = false }
 }
-
 const deleteIndicator = async (id) => {
-  try { await api.delete(`/indicators/${id}`); await fetchTopics(); showSnackbar('ลบสำเร็จ') }
-  catch (e) { showSnackbar('เกิดข้อผิดพลาด', 'error') }
+  try { await api.delete(`/indicators/${id}`); await fetchTopics(); success('ลบสำเร็จ') } catch { error() }
 }
 
 onMounted(fetchTopics)
