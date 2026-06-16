@@ -22,7 +22,7 @@
             <v-chip size="small" :color="a.committee_role==='chairman'?'warning':'info'" label class="mr-2">
               {{ a.committee_role==='chairman'?'ประธาน':'กรรมการ' }}
             </v-chip>
-            <v-chip size="small" :color="statusColor(a.status)" label>{{ statusLabel(a.status) }}</v-chip>
+            <StatusChip :status="a.status" />
           </div>
           <v-btn block :color="a.status==='completed'?'success':'primary'" variant="tonal" :to="`/committee/score/${a.id}`" rounded="lg">
             <v-icon start>{{ a.status==='completed'?'mdi-eye':'mdi-pencil' }}</v-icon>
@@ -32,19 +32,24 @@
       </v-col>
     </v-row>
 
-    <v-card v-if="assignments.length===0 && !loading" class="glass-card pa-10 text-center">
-      <v-icon size="64" color="info" class="mb-3">mdi-clipboard-check-outline</v-icon>
-      <h3 class="text-h5 mb-2">ยังไม่มีรายการประเมิน</h3>
-      <p class="text-medium-emphasis">รอฝ่ายบุคลากรมอบหมายรายการ</p>
-    </v-card>
+    <EmptyState v-if="assignments.length===0 && !loading" icon="mdi-clipboard-check-outline" color="info"
+      title="ยังไม่มีรายการประเมิน" subtitle="รอฝ่ายบุคลากรมอบหมายรายการ" />
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { useAuthStore, api } from '../../stores/auth'
-const auth = useAuthStore(); const assignments = ref([]); const loading = ref(true)
-const statusColor = s => ({pending:'grey',in_progress:'warning',completed:'success'}[s]||'grey')
-const statusLabel = s => ({pending:'รอดำเนินการ',in_progress:'กำลังประเมิน',completed:'เสร็จสิ้น'}[s]||s)
-onMounted(async () => { try { const { data } = await api.get(`/assignments/committee/${auth.user.id}`); assignments.value = data.data || [] } catch(e){} finally { loading.value = false } })
+import { useAuthStore } from '../../stores/auth'
+import { api } from '../../lib/api'
+import StatusChip from '../../components/StatusChip.vue'
+import EmptyState from '../../components/EmptyState.vue'
+
+const auth = useAuthStore()
+const assignments = ref([])
+const loading = ref(true)
+
+onMounted(async () => {
+  try { assignments.value = (await api.get(`/assignments/committee/${auth.user.id}`)).data.data || [] }
+  catch (e) { /* noop */ } finally { loading.value = false }
+})
 </script>

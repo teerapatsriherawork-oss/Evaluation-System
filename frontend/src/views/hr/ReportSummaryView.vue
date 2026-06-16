@@ -9,23 +9,21 @@
       </v-col>
     </v-row>
 
-    <!-- Summary Stats -->
     <v-row class="mb-4" v-if="summary.period">
       <v-col cols="6" sm="3">
         <v-card class="glass-card pa-4 stat-card-primary"><div class="text-h4 font-weight-bold">{{ summary.total_evaluatees }}</div><div class="text-caption text-medium-emphasis">ผู้รับการประเมิน</div></v-card>
       </v-col>
       <v-col cols="6" sm="3">
-        <v-card class="glass-card pa-4 stat-card-success"><div class="text-h4 font-weight-bold">{{ summary.score_summary?.avg_score ? Number(summary.score_summary.avg_score).toFixed(1) : '-' }}</div><div class="text-caption text-medium-emphasis">คะแนนเฉลี่ย</div></v-card>
+        <v-card class="glass-card pa-4 stat-card-success"><div class="text-h4 font-weight-bold">{{ fmt(summary.score_summary?.avg_score) }}</div><div class="text-caption text-medium-emphasis">คะแนนเฉลี่ย</div></v-card>
       </v-col>
       <v-col cols="6" sm="3">
-        <v-card class="glass-card pa-4 stat-card-info"><div class="text-h4 font-weight-bold">{{ summary.score_summary?.max_score ? Number(summary.score_summary.max_score).toFixed(1) : '-' }}</div><div class="text-caption text-medium-emphasis">คะแนนสูงสุด</div></v-card>
+        <v-card class="glass-card pa-4 stat-card-info"><div class="text-h4 font-weight-bold">{{ fmt(summary.score_summary?.max_score) }}</div><div class="text-caption text-medium-emphasis">คะแนนสูงสุด</div></v-card>
       </v-col>
       <v-col cols="6" sm="3">
-        <v-card class="glass-card pa-4 stat-card-warning"><div class="text-h4 font-weight-bold">{{ summary.score_summary?.min_score ? Number(summary.score_summary.min_score).toFixed(1) : '-' }}</div><div class="text-caption text-medium-emphasis">คะแนนต่ำสุด</div></v-card>
+        <v-card class="glass-card pa-4 stat-card-warning"><div class="text-h4 font-weight-bold">{{ fmt(summary.score_summary?.min_score) }}</div><div class="text-caption text-medium-emphasis">คะแนนต่ำสุด</div></v-card>
       </v-col>
     </v-row>
 
-    <!-- Status Breakdown -->
     <v-card class="glass-card pa-5 mb-4" v-if="summary.status_breakdown?.length">
       <div class="text-h6 font-weight-medium mb-3"><v-icon color="primary" class="mr-2">mdi-chart-donut</v-icon>สถานะการประเมิน</div>
       <div class="d-flex ga-4">
@@ -35,20 +33,22 @@
       </div>
     </v-card>
 
-    <!-- Individual Reports -->
     <v-card class="glass-card pa-5">
       <div class="text-h6 font-weight-medium mb-3"><v-icon color="secondary" class="mr-2">mdi-account-details</v-icon>ผลการประเมินรายบุคคล</div>
       <v-text-field v-model="search" prepend-inner-icon="mdi-magnify" placeholder="ค้นหาชื่อ..." density="compact" class="mb-3" style="max-width:300px" clearable />
       <v-table density="compact" class="bg-transparent">
         <thead><tr><th>ชื่อ-สกุล</th><th>แผนก</th><th>คะแนนเฉลี่ย</th><th>จำนวนกรรมการ</th><th>ดำเนินการ</th></tr></thead>
         <tbody>
-          <tr v-for="u in filteredEvaluatees" :key="u.id">
+          <tr v-for="u in filtered" :key="u.id">
             <td>{{ u.full_name }}</td><td>{{ u.department || '-' }}</td>
             <td><span class="font-weight-bold">{{ u.avg_score || '-' }}</span></td>
             <td>{{ u.committee_count || 0 }}</td>
-            <td><v-btn size="small" color="primary" variant="tonal" @click="viewReport(u.id)" rounded="lg"><v-icon start size="small">mdi-eye</v-icon>ดูรายงาน</v-btn></td>
+            <td>
+              <v-btn size="small" color="primary" variant="tonal" @click="viewReport(u.id)" rounded="lg" class="mr-1"><v-icon start size="small">mdi-eye</v-icon>ดูรายงาน</v-btn>
+              <v-btn size="small" color="error" variant="tonal" @click="downloadPdf(u.id)" rounded="lg" icon="mdi-file-pdf-box" />
+            </td>
           </tr>
-          <tr v-if="filteredEvaluatees.length===0"><td colspan="5" class="text-center text-medium-emphasis py-4">ไม่พบข้อมูล</td></tr>
+          <tr v-if="filtered.length===0"><td colspan="5" class="text-center text-medium-emphasis py-4">ไม่พบข้อมูล</td></tr>
         </tbody>
       </v-table>
     </v-card>
@@ -73,7 +73,10 @@
             </tr>
           </tbody>
         </v-table>
-        <div class="d-flex justify-end"><v-btn variant="text" @click="reportDlg=false">ปิด</v-btn></div>
+        <div class="d-flex justify-end ga-2">
+          <v-btn color="error" variant="tonal" @click="downloadPdf(report.user?.id)"><v-icon start>mdi-file-pdf-box</v-icon>ดาวน์โหลด PDF</v-btn>
+          <v-btn variant="text" @click="reportDlg=false">ปิด</v-btn>
+        </div>
       </v-card>
     </v-dialog>
   </div>
@@ -81,33 +84,52 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { api } from '../../stores/auth'
-const periodId = ref(null); const periodItems = ref([]); const summary = ref({}); const evaluatees = ref([]); const search = ref(''); const reportDlg = ref(false); const report = ref({})
-const statusColor = s => ({pending:'grey',in_progress:'warning',completed:'success'}[s]||'grey')
-const statusLabel = s => ({pending:'รอดำเนินการ',in_progress:'กำลังประเมิน',completed:'เสร็จสิ้น'}[s]||s)
-const filteredEvaluatees = computed(() => { let list = evaluatees.value; if(search.value){ const s=search.value.toLowerCase(); list=list.filter(u=>u.full_name?.toLowerCase().includes(s)) } return list })
+import { api } from '../../lib/api'
+import { statusColor, statusLabel } from '../../lib/format'
+
+const periodId = ref(null)
+const periodItems = ref([])
+const summary = ref({})
+const evaluatees = ref([])
+const search = ref('')
+const reportDlg = ref(false)
+const report = ref({})
+
+const fmt = (n) => (n != null ? Number(n).toFixed(1) : '-')
+const filtered = computed(() => {
+  if (!search.value) return evaluatees.value
+  const s = search.value.toLowerCase()
+  return evaluatees.value.filter(u => u.full_name?.toLowerCase().includes(s))
+})
 
 const fetchSummary = async () => {
   if (!periodId.value) return
   try {
-    const { data } = await api.get(`/reports/summary/${periodId.value}`); summary.value = data.data || {}
+    const { data } = await api.get(`/reports/summary/${periodId.value}`)
+    summary.value = data.data || {}
     const uRes = await api.get('/users?role=evaluatee')
     const users = uRes.data.data || []
-    // Enrich evaluatees with individual report data
-    const enriched = await Promise.all(users.map(async (u) => {
+    // เติมคะแนนเฉลี่ย + จำนวนกรรมการของแต่ละคนจากรายงานรายบุคคล
+    evaluatees.value = await Promise.all(users.map(async (u) => {
       try {
-        const rRes = await api.get(`/reports/individual/${u.id}`)
-        const rd = rRes.data.data || {}
+        const rd = (await api.get(`/reports/individual/${u.id}`)).data.data || {}
         return { ...u, avg_score: rd.summary?.average_score || null, committee_count: rd.summary?.total_committees || 0 }
       } catch { return { ...u, avg_score: null, committee_count: 0 } }
     }))
-    evaluatees.value = enriched
-  } catch(e){}
+  } catch (e) { /* noop */ }
 }
 
-const viewReport = async (evaluateeId) => {
-  try { const { data } = await api.get(`/reports/individual/${evaluateeId}`); report.value = data.data || {}; reportDlg.value = true } catch(e){}
+const viewReport = async (id) => {
+  try { report.value = (await api.get(`/reports/individual/${id}`)).data.data || {}; reportDlg.value = true } catch (e) { /* noop */ }
 }
 
-onMounted(async () => { try { const { data } = await api.get('/evaluations'); const p=data.data||[]; periodItems.value=p.map(x=>({title:x.title,value:x.id})); if(p.length){periodId.value=p[0].id; await fetchSummary()} } catch(e){} })
+// เปิด PDF (cookie แนบไปกับ request อัตโนมัติ) → เบราว์เซอร์ดาวน์โหลดไฟล์
+const downloadPdf = (id) => { if (id) window.open(`/api/reports/pdf/${id}`, '_blank') }
+
+onMounted(async () => {
+  const { data } = await api.get('/evaluations')
+  const p = data.data || []
+  periodItems.value = p.map(x => ({ title: x.title, value: x.id }))
+  if (p.length) { periodId.value = p[0].id; await fetchSummary() }
+})
 </script>

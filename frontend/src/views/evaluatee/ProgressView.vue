@@ -14,18 +14,10 @@
         </div>
       </div>
       <v-row class="mt-2">
-        <v-col cols="6" sm="3">
-          <div class="text-center"><div class="text-h4 font-weight-bold text-primary">{{ progress.total }}</div><div class="text-caption text-medium-emphasis">ตัวชี้วัดทั้งหมด</div></div>
-        </v-col>
-        <v-col cols="6" sm="3">
-          <div class="text-center"><div class="text-h4 font-weight-bold text-success">{{ progress.completed }}</div><div class="text-caption text-medium-emphasis">เสร็จสิ้น</div></div>
-        </v-col>
-        <v-col cols="6" sm="3">
-          <div class="text-center"><div class="text-h4 font-weight-bold text-warning">{{ progress.draft }}</div><div class="text-caption text-medium-emphasis">ร่าง</div></div>
-        </v-col>
-        <v-col cols="6" sm="3">
-          <div class="text-center"><div class="text-h4 font-weight-bold text-error">{{ progress.remaining }}</div><div class="text-caption text-medium-emphasis">เหลือ</div></div>
-        </v-col>
+        <v-col cols="6" sm="3"><div class="text-center"><div class="text-h4 font-weight-bold text-primary">{{ progress.total }}</div><div class="text-caption text-medium-emphasis">ตัวชี้วัดทั้งหมด</div></div></v-col>
+        <v-col cols="6" sm="3"><div class="text-center"><div class="text-h4 font-weight-bold text-success">{{ progress.completed }}</div><div class="text-caption text-medium-emphasis">เสร็จสิ้น</div></div></v-col>
+        <v-col cols="6" sm="3"><div class="text-center"><div class="text-h4 font-weight-bold text-warning">{{ progress.draft }}</div><div class="text-caption text-medium-emphasis">ร่าง</div></div></v-col>
+        <v-col cols="6" sm="3"><div class="text-center"><div class="text-h4 font-weight-bold text-error">{{ progress.remaining }}</div><div class="text-caption text-medium-emphasis">เหลือ</div></div></v-col>
       </v-row>
     </v-card>
 
@@ -45,7 +37,7 @@
     </v-card>
 
     <div class="mt-4 d-flex justify-end">
-      <v-btn color="error" variant="tonal" @click="exportPDF" :loading="exporting" rounded="lg">
+      <v-btn color="error" variant="tonal" @click="exportPDF" rounded="lg">
         <v-icon start>mdi-file-pdf-box</v-icon> Export PDF
       </v-btn>
     </div>
@@ -53,11 +45,15 @@
 </template>
 
 <script setup>
-import { ref, onMounted, inject } from 'vue'
-import { useAuthStore, api } from '../../stores/auth'
-const auth = useAuthStore(); const showSnackbar = inject('showSnackbar')
+import { ref, onMounted } from 'vue'
+import { useAuthStore } from '../../stores/auth'
+import { api } from '../../lib/api'
+import { useNotify } from '../../composables/useNotify'
+
+const auth = useAuthStore()
+const { success, error } = useNotify()
 const progress = ref({ total: 0, completed: 0, draft: 0, remaining: 0, progress: 0 })
-const selfData = ref([]); const exporting = ref(false)
+const selfData = ref([])
 
 onMounted(async () => {
   try {
@@ -67,26 +63,25 @@ onMounted(async () => {
     ])
     progress.value = pRes.data.data || progress.value
     selfData.value = saRes.data.data || []
-  } catch(e){}
+  } catch (e) { /* noop */ }
 })
 
-const exportPDF = async () => {
-  exporting.value = true
+// สร้าง PDF ฝั่ง client ด้วย window.print() — รองรับฟอนต์ไทยของเบราว์เซอร์
+const exportPDF = () => {
   try {
-    // Simple client-side PDF generation using window.print()
-    const printWindow = window.open('', '_blank')
+    const rows = selfData.value.map(s =>
+      `<tr><td>${s.indicator_name}</td><td>${s.topic_title}</td><td>${s.weight}</td><td>${s.self_score ?? '-'}</td><td>${s.status === 'submitted' ? 'ส่งแล้ว' : 'ร่าง'}</td></tr>`
+    ).join('')
     const html = `<html><head><title>ผลการประเมินตนเอง - ${auth.userName}</title>
       <style>body{font-family:Sarabun,sans-serif;padding:20px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:8px;text-align:left}th{background:#f0f0f0}.header{text-align:center;margin-bottom:20px}</style></head>
       <body><div class="header"><h2>รายงานผลการประเมินตนเอง</h2><p>${auth.userName} | ${auth.user?.department || ''}</p></div>
       <p><strong>ความคืบหน้า:</strong> ${progress.value.progress}% (${progress.value.completed}/${progress.value.total})</p>
-      <table><tr><th>ตัวชี้วัด</th><th>หัวข้อ</th><th>น้ำหนัก</th><th>คะแนน</th><th>สถานะ</th></tr>
-      ${selfData.value.map(s => `<tr><td>${s.indicator_name}</td><td>${s.topic_title}</td><td>${s.weight}</td><td>${s.self_score ?? '-'}</td><td>${s.status==='submitted'?'ส่งแล้ว':'ร่าง'}</td></tr>`).join('')}
-      </table></body></html>`
-    printWindow.document.write(html)
-    printWindow.document.close()
-    printWindow.print()
-    showSnackbar('สร้าง PDF สำเร็จ')
-  } catch(e){ showSnackbar('เกิดข้อผิดพลาด','error') }
-  finally { exporting.value = false }
+      <table><tr><th>ตัวชี้วัด</th><th>หัวข้อ</th><th>น้ำหนัก</th><th>คะแนน</th><th>สถานะ</th></tr>${rows}</table></body></html>`
+    const w = window.open('', '_blank')
+    w.document.write(html)
+    w.document.close()
+    w.print()
+    success('สร้าง PDF สำเร็จ')
+  } catch (e) { error() }
 }
 </script>

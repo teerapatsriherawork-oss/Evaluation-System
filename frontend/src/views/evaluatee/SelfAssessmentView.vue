@@ -29,11 +29,11 @@
               <template v-if="ind.score_type === 'scale'">
                 <div class="text-body-2 mb-1 font-weight-medium">คะแนนประเมินตนเอง:</div>
                 <v-btn-toggle v-model="assessments[ind.id].self_score" color="primary" rounded="lg" density="compact">
-                  <v-btn :value="1" size="small">1<div class="text-caption">ต่ำกว่ามาก</div></v-btn>
-                  <v-btn :value="2" size="small">2<div class="text-caption">ต่ำกว่า</div></v-btn>
-                  <v-btn :value="3" size="small">3<div class="text-caption">ตามคาดหวัง</div></v-btn>
-                  <v-btn :value="4" size="small">4<div class="text-caption">สูงกว่า</div></v-btn>
+                  <v-btn v-for="n in 4" :key="n" :value="n" size="small">{{ n }}</v-btn>
                 </v-btn-toggle>
+                <div class="text-caption text-medium-emphasis mt-1">
+                  <span v-for="(lvl, i) in levelsOf(ind)" :key="i" class="mr-3">{{ i + 1 }} = {{ lvl }}</span>
+                </div>
               </template>
               <template v-else>
                 <v-switch v-model="assessments[ind.id].self_score" :true-value="1" :false-value="0" label="มี / ไม่มี" color="success" />
@@ -67,57 +67,58 @@
       </v-expansion-panel>
     </v-expansion-panels>
 
-    <v-card v-if="!Object.keys(groupedIndicators).length && !loading" class="glass-card pa-10 text-center">
-      <v-icon size="64" color="secondary" class="mb-3">mdi-clipboard-text-clock</v-icon>
-      <h3 class="text-h5 mb-2">ยังไม่มีตัวชี้วัด</h3>
-      <p class="text-medium-emphasis">รอฝ่ายบุคลากรเพิ่มรอบประเมินและตัวชี้วัด</p>
-    </v-card>
+    <EmptyState v-if="!Object.keys(groupedIndicators).length && !loading" icon="mdi-clipboard-text-clock"
+      color="secondary" title="ยังไม่มีตัวชี้วัด" subtitle="รอฝ่ายบุคลากรเพิ่มรอบประเมินและตัวชี้วัด" />
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, inject } from 'vue'
-import { useAuthStore, api } from '../../stores/auth'
-const auth = useAuthStore(); const showSnackbar = inject('showSnackbar')
-const loading = ref(false); const indicators = ref([]); const assessments = reactive({})
+import { ref, reactive, computed, onMounted } from 'vue'
+import { useAuthStore } from '../../stores/auth'
+import { api } from '../../lib/api'
+import { useNotify } from '../../composables/useNotify'
+import { parseScoreLevels } from '../../lib/format'
+import EmptyState from '../../components/EmptyState.vue'
+
+const auth = useAuthStore()
+const { success, error } = useNotify()
+const loading = ref(false)
+const indicators = ref([])
+const assessments = reactive({})
 
 const groupedIndicators = computed(() => {
   const groups = {}
   indicators.value.forEach(ind => {
     const title = ind.topic_title || 'ไม่ระบุหัวข้อ'
-    if (!groups[title]) groups[title] = []
-    groups[title].push(ind)
+    ;(groups[title] ||= []).push(ind)
   })
   return groups
 })
 
-const completedCount = group => group.filter(ind => assessments[ind.id]?.status === 'submitted').length
+const completedCount = (group) => group.filter(ind => assessments[ind.id]?.status === 'submitted').length
+// คำอธิบายระดับ 1-4 ที่ HR กำหนดไว้ในตัวชี้วัด (หรือค่า default)
+const levelsOf = (ind) => parseScoreLevels(ind.score_levels)
 
 const fetchData = async () => {
   loading.value = true
   try {
-    const pRes = await api.get('/evaluations?is_active=true')
-    const activePeriods = pRes.data.data || []
-    if (activePeriods.length === 0) { loading.value = false; return }
-    const indRes = await api.get(`/indicators/period/${activePeriods[0].id}`)
-    indicators.value = indRes.data.data || []
+    const activePeriods = (await api.get('/evaluations?is_active=true')).data.data || []
+    if (!activePeriods.length) return
+    indicators.value = (await api.get(`/indicators/period/${activePeriods[0].id}`)).data.data || []
 
-    // Initialize assessments
     indicators.value.forEach(ind => {
       if (!assessments[ind.id]) {
         assessments[ind.id] = { self_score: null, self_data: '', evidence_file: '', evidence_url: '', status: 'draft', _file: null, _saving: false }
       }
     })
 
-    // Fetch existing self-assessments
-    const saRes = await api.get(`/self-assessments/${auth.user.id}`)
-    const existing = saRes.data.data || []
+    const existing = (await api.get(`/self-assessments/${auth.user.id}`)).data.data || []
     existing.forEach(sa => {
       if (assessments[sa.indicator_id]) {
         Object.assign(assessments[sa.indicator_id], { self_score: sa.self_score, self_data: sa.self_data, evidence_file: sa.evidence_file, evidence_url: sa.evidence_url, status: sa.status })
       }
     })
-  } catch(e){ console.error(e) } finally { loading.value = false }
+  } catch (e) { console.error(e) } finally { loading.value = false }
 }
 
 const uploadEvidence = async (indId) => {
@@ -128,25 +129,21 @@ const uploadEvidence = async (indId) => {
   try {
     const { data } = await api.post('/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
     assessments[indId].evidence_file = data.data.file_path
-    showSnackbar('อัปโหลดสำเร็จ')
-  } catch(e){ showSnackbar('อัปโหลดล้มเหลว','error') }
+    success('อัปโหลดสำเร็จ')
+  } catch (e) { error('อัปโหลดล้มเหลว') }
 }
 
 const saveAssessment = async (indId, status) => {
   assessments[indId]._saving = true
   try {
+    const a = assessments[indId]
     await api.post('/self-assessments', {
-      indicator_id: indId,
-      self_score: assessments[indId].self_score,
-      self_data: assessments[indId].self_data,
-      evidence_file: assessments[indId].evidence_file,
-      evidence_url: assessments[indId].evidence_url,
-      status
+      indicator_id: indId, self_score: a.self_score, self_data: a.self_data,
+      evidence_file: a.evidence_file, evidence_url: a.evidence_url, status
     })
-    assessments[indId].status = status
-    showSnackbar(status === 'submitted' ? 'ส่งสำเร็จ' : 'บันทึกร่างสำเร็จ')
-  } catch(e){ showSnackbar('เกิดข้อผิดพลาด','error') }
-  finally { assessments[indId]._saving = false }
+    a.status = status
+    success(status === 'submitted' ? 'ส่งสำเร็จ' : 'บันทึกร่างสำเร็จ')
+  } catch (e) { error() } finally { assessments[indId]._saving = false }
 }
 
 onMounted(fetchData)

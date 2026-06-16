@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS indicators (
   weight DECIMAL(5,2) NOT NULL DEFAULT 1.00,
   evidence_type ENUM('file','url','both') DEFAULT 'both',
   score_type ENUM('boolean','scale') NOT NULL DEFAULT 'scale',
+  score_levels TEXT,  -- JSON: คำอธิบายระดับคะแนน 1-4 (เกณฑ์ 5.1.4) เช่น ["ต่ำกว่ามาก","ต่ำกว่า","ตามคาดหวัง","สูงกว่า"]
   sort_order INT DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (topic_id) REFERENCES evaluation_topics(id) ON DELETE CASCADE

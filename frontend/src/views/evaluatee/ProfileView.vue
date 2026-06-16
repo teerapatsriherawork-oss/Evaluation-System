@@ -5,8 +5,8 @@
 
     <v-card class="glass-card pa-6" max-width="600">
       <v-form @submit.prevent="saveProfile" ref="formRef">
-        <v-text-field v-model="form.full_name" label="ชื่อ-สกุล *" prepend-inner-icon="mdi-account" :rules="[r=>!!r||'กรุณากรอก']" class="mb-2" />
-        <v-text-field v-model="form.email" label="อีเมล" prepend-inner-icon="mdi-email" :rules="[rules.email]" class="mb-2" />
+        <v-text-field v-model="form.full_name" label="ชื่อ-สกุล *" prepend-inner-icon="mdi-account" :rules="[req]" class="mb-2" />
+        <v-text-field v-model="form.email" label="อีเมล" prepend-inner-icon="mdi-email" :rules="[emailRule]" class="mb-2" />
         <v-row dense>
           <v-col cols="6"><v-text-field v-model="form.phone" label="เบอร์โทร" prepend-inner-icon="mdi-phone" /></v-col>
           <v-col cols="6"><v-text-field v-model="form.department" label="แผนก/หน่วยงาน" prepend-inner-icon="mdi-domain" /></v-col>
@@ -19,19 +19,27 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, inject } from 'vue'
-import { useAuthStore, api } from '../../stores/auth'
-const auth = useAuthStore(); const showSnackbar = inject('showSnackbar'); const saving = ref(false); const formRef = ref(null)
+import { ref, reactive, onMounted } from 'vue'
+import { useAuthStore } from '../../stores/auth'
+import { api } from '../../lib/api'
+import { useNotify } from '../../composables/useNotify'
+
+const auth = useAuthStore()
+const { success, error } = useNotify()
+const saving = ref(false)
+const formRef = ref(null)
 const form = reactive({ full_name: '', email: '', phone: '', department: '', position: '' })
-const rules = { email: v => (!v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) || 'รูปแบบอีเมลไม่ถูกต้อง' }
+const req = (v) => !!v || 'กรุณากรอกข้อมูล'
+const emailRule = (v) => (!v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) || 'รูปแบบอีเมลไม่ถูกต้อง'
 
 onMounted(async () => {
-  try { const { data } = await api.get('/auth/me'); Object.assign(form, data.data) } catch(e){}
+  try { Object.assign(form, (await api.get('/auth/me')).data.data) } catch (e) { /* noop */ }
 })
 
 const saveProfile = async () => {
-  const { valid } = await formRef.value.validate(); if (!valid) return; saving.value = true
-  try { await api.put('/users/profile', form); await auth.fetchMe(); showSnackbar('บันทึกสำเร็จ') }
-  catch(e){ showSnackbar('เกิดข้อผิดพลาด','error') } finally { saving.value = false }
+  const { valid } = await formRef.value.validate(); if (!valid) return
+  saving.value = true
+  try { await api.put('/users/profile', form); await auth.fetchMe(); success('บันทึกสำเร็จ') }
+  catch (e) { error() } finally { saving.value = false }
 }
 </script>

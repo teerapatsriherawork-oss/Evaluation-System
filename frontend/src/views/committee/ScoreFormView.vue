@@ -6,13 +6,11 @@
       <p class="text-body-2 text-medium-emphasis mt-1">{{ isCompleted ? 'ดูรายละเอียดผลการประเมินที่บันทึกไว้' : 'ให้คะแนนผู้รับการประเมินตามตัวชี้วัด' }}</p></div>
     </div>
 
-    <!-- Completed badge -->
     <v-alert v-if="isCompleted" type="success" variant="tonal" class="mb-4" rounded="lg">
       <v-icon start>mdi-check-circle</v-icon>
       การประเมินนี้เสร็จสิ้นแล้ว — แสดงผลแบบอ่านอย่างเดียว
     </v-alert>
 
-    <!-- Scoring Form -->
     <v-expansion-panels variant="accordion">
       <v-expansion-panel v-for="(group, topicTitle) in groupedScores" :key="topicTitle" class="glass-card mb-3" rounded="xl">
         <v-expansion-panel-title>
@@ -28,7 +26,7 @@
             </div>
             <p class="text-body-2 text-medium-emphasis mb-2" v-if="item.indicator_desc">{{ item.indicator_desc }}</p>
 
-            <!-- Self-assessment info -->
+            <!-- คะแนนประเมินตนเองของผู้รับการประเมิน -->
             <v-alert v-if="item.self_score !== null && item.self_score !== undefined" type="info" variant="tonal" density="compact" class="mb-3" rounded="lg">
               <div class="text-body-2">
                 <strong>คะแนนประเมินตนเอง:</strong> {{ item.self_score }}
@@ -36,7 +34,7 @@
               </div>
               <div v-if="item.evidence_file" class="mt-1">
                 <v-icon size="small" class="mr-1">mdi-paperclip</v-icon>
-                <a :href="`/api/uploads/file/${item.evidence_file}`" target="_blank" class="text-info">ดูหลักฐาน</a>
+                <a :href="item.evidence_file" target="_blank" class="text-info">ดูหลักฐาน</a>
               </div>
               <div v-if="item.evidence_url" class="mt-1">
                 <v-icon size="small" class="mr-1">mdi-link</v-icon>
@@ -44,16 +42,16 @@
               </div>
             </v-alert>
 
-            <!-- Committee Score -->
+            <!-- คะแนนจากกรรมการ -->
             <div class="mb-2">
               <div class="text-body-2 font-weight-medium mb-1">คะแนนจากกรรมการ:</div>
               <template v-if="item.score_type === 'scale'">
                 <v-btn-toggle v-model="scores[item.indicator_id].score" color="primary" rounded="lg" density="compact" :disabled="isCompleted">
-                  <v-btn :value="1" size="small">1<div class="text-caption">ต่ำมาก</div></v-btn>
-                  <v-btn :value="2" size="small">2<div class="text-caption">ต่ำ</div></v-btn>
-                  <v-btn :value="3" size="small">3<div class="text-caption">ตามคาดหวัง</div></v-btn>
-                  <v-btn :value="4" size="small">4<div class="text-caption">สูงกว่า</div></v-btn>
+                  <v-btn v-for="n in 4" :key="n" :value="n" size="small">{{ n }}</v-btn>
                 </v-btn-toggle>
+                <div class="text-caption text-medium-emphasis mt-1">
+                  <span v-for="(lvl, i) in levelsOf(item)" :key="i" class="mr-3">{{ i + 1 }} = {{ lvl }}</span>
+                </div>
               </template>
               <template v-else>
                 <v-switch v-model="scores[item.indicator_id].score" :true-value="1" :false-value="0" label="มี / ไม่มี" color="success" :disabled="isCompleted" />
@@ -70,17 +68,14 @@
       </v-expansion-panel>
     </v-expansion-panels>
 
-    <!-- Overall + Signature -->
+    <!-- สรุปและลงนาม -->
     <v-card class="glass-card pa-6 mt-4" v-if="Object.keys(groupedScores).length">
       <div class="text-h6 font-weight-medium mb-4"><v-icon color="primary" class="mr-2">mdi-draw-pen</v-icon>สรุปและลงนาม</div>
 
-      <!-- Read-only mode: show saved data -->
       <template v-if="isCompleted">
         <div class="mb-4">
           <div class="text-body-2 font-weight-medium mb-1">ความคิดเห็นสรุป:</div>
-          <v-card variant="outlined" class="pa-3" rounded="lg">
-            <div class="text-body-1">{{ overallComment || '(ไม่มีความคิดเห็น)' }}</div>
-          </v-card>
+          <v-card variant="outlined" class="pa-3" rounded="lg"><div class="text-body-1">{{ overallComment || '(ไม่มีความคิดเห็น)' }}</div></v-card>
         </div>
         <div v-if="savedSignature" class="mb-4">
           <div class="text-body-2 font-weight-medium mb-2">ลายเซ็น:</div>
@@ -90,16 +85,12 @@
         </div>
         <v-divider class="my-4" />
         <div class="d-flex justify-end">
-          <v-btn variant="tonal" color="primary" @click="$router.back()" rounded="lg">
-            <v-icon start>mdi-arrow-left</v-icon> กลับ
-          </v-btn>
+          <v-btn variant="tonal" color="primary" @click="$router.back()" rounded="lg"><v-icon start>mdi-arrow-left</v-icon> กลับ</v-btn>
         </div>
       </template>
 
-      <!-- Edit mode: draw signature -->
       <template v-else>
         <v-textarea v-model="overallComment" label="ความคิดเห็นสรุปโดยภาพรวมของการประเมิน" rows="3" class="mb-3" />
-
         <div class="text-body-2 font-weight-medium mb-2">ลงนามการประเมิน (วาดลายเซ็น):</div>
         <div style="border:2px solid rgba(99,102,241,0.3);border-radius:12px;background:rgba(0,0,0,0.2)">
           <canvas ref="signCanvas" width="500" height="150" @mousedown="startDraw" @mousemove="draw" @mouseup="endDraw" @mouseleave="endDraw" style="cursor:crosshair;display:block;width:100%;height:150px" />
@@ -107,7 +98,6 @@
         <div class="d-flex ga-2 mt-2">
           <v-btn size="small" variant="text" @click="clearSignature"><v-icon start size="small">mdi-eraser</v-icon>ล้าง</v-btn>
         </div>
-
         <v-divider class="my-4" />
         <div class="d-flex ga-2 justify-end">
           <v-btn variant="text" @click="$router.back()">ยกเลิก</v-btn>
@@ -121,25 +111,36 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, inject } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { api } from '../../stores/auth'
+import { api } from '../../lib/api'
+import { useNotify } from '../../composables/useNotify'
+import { parseScoreLevels } from '../../lib/format'
 
-const route = useRoute(); const router = useRouter(); const showSnackbar = inject('showSnackbar')
+const route = useRoute()
+const router = useRouter()
+const { success, error } = useNotify()
 const assignmentId = route.params.assignmentId
-const items = ref([]); const scores = reactive({}); const overallComment = ref(''); const submitting = ref(false)
-const signCanvas = ref(null); let drawing = false; let ctx = null
-const isCompleted = ref(false); const savedSignature = ref(null)
+const items = ref([])
+const scores = reactive({})
+const overallComment = ref('')
+const submitting = ref(false)
+const signCanvas = ref(null)
+const isCompleted = ref(false)
+const savedSignature = ref(null)
+let drawing = false
+let ctx = null
 
 const groupedScores = computed(() => {
   const groups = {}
   items.value.forEach(item => {
     const title = item.topic_title || 'ไม่ระบุ'
-    if (!groups[title]) groups[title] = []
-    groups[title].push(item)
+    ;(groups[title] ||= []).push(item)
   })
   return groups
 })
+
+const levelsOf = (item) => parseScoreLevels(item.score_levels)
 
 const ensureCtx = () => {
   if (!ctx && signCanvas.value) {
@@ -153,56 +154,47 @@ const ensureCtx = () => {
 
 onMounted(async () => {
   try {
-    const { data } = await api.get(`/scores/assignment/${assignmentId}`)
-    items.value = data.data || []
+    items.value = (await api.get(`/scores/assignment/${assignmentId}`)).data.data || []
     items.value.forEach(item => {
       scores[item.indicator_id] = { score: item.score, comment: item.comment || '', _saving: false }
     })
-  } catch(e){ console.error(e) }
+  } catch (e) { console.error(e) }
 
-  // Check if assignment is completed and load saved result
+  // ถ้าประเมินเสร็จแล้ว → โหลดผล + ลายเซ็นที่บันทึก แล้วแสดงแบบอ่านอย่างเดียว
   try {
-    const { data: assignData } = await api.get(`/assignments/committee/check/${assignmentId}`)
-    if (assignData.data && assignData.data.status === 'completed') {
+    const assign = (await api.get(`/assignments/committee/check/${assignmentId}`)).data.data
+    if (assign?.status === 'completed') {
       isCompleted.value = true
-      // Load saved evaluation result
-      const { data: resultData } = await api.get(`/scores/result/${assignmentId}`)
-      if (resultData.data) {
-        overallComment.value = resultData.data.overall_comment || ''
-        savedSignature.value = resultData.data.signature_image || null
+      const result = (await api.get(`/scores/result/${assignmentId}`)).data.data
+      if (result) {
+        overallComment.value = result.overall_comment || ''
+        savedSignature.value = result.signature_image || null
       }
     }
-  } catch(e){ console.error('load result error:', e) }
+  } catch (e) { console.error('load result error:', e) }
 })
 
 const saveScore = async (indicatorId) => {
   scores[indicatorId]._saving = true
   try {
     await api.post('/scores', { assignment_id: parseInt(assignmentId), indicator_id: indicatorId, score: scores[indicatorId].score, comment: scores[indicatorId].comment })
-    showSnackbar('บันทึกคะแนนสำเร็จ')
-  } catch(e){ showSnackbar('เกิดข้อผิดพลาด','error') }
-  finally { scores[indicatorId]._saving = false }
+    success('บันทึกคะแนนสำเร็จ')
+  } catch (e) { error() } finally { scores[indicatorId]._saving = false }
 }
 
-const startDraw = (e) => {
-  const c = ensureCtx()
-  if (!c) return
-  drawing = true
+// ----- ลายเซ็นบน canvas -----
+const pos = (e) => {
   const r = signCanvas.value.getBoundingClientRect()
-  const scaleX = signCanvas.value.width / r.width
-  const scaleY = signCanvas.value.height / r.height
-  c.beginPath()
-  c.moveTo((e.clientX - r.left) * scaleX, (e.clientY - r.top) * scaleY)
+  return [(e.clientX - r.left) * (signCanvas.value.width / r.width), (e.clientY - r.top) * (signCanvas.value.height / r.height)]
+}
+const startDraw = (e) => {
+  const c = ensureCtx(); if (!c) return
+  drawing = true; c.beginPath(); c.moveTo(...pos(e))
 }
 const draw = (e) => {
   if (!drawing) return
-  const c = ensureCtx()
-  if (!c) return
-  const r = signCanvas.value.getBoundingClientRect()
-  const scaleX = signCanvas.value.width / r.width
-  const scaleY = signCanvas.value.height / r.height
-  c.lineTo((e.clientX - r.left) * scaleX, (e.clientY - r.top) * scaleY)
-  c.stroke()
+  const c = ensureCtx(); if (!c) return
+  c.lineTo(...pos(e)); c.stroke()
 }
 const endDraw = () => { drawing = false }
 const clearSignature = () => { const c = ensureCtx(); if (c) c.clearRect(0, 0, signCanvas.value.width, signCanvas.value.height) }
@@ -212,9 +204,8 @@ const submitEvaluation = async () => {
   try {
     const sigData = signCanvas.value ? signCanvas.value.toDataURL() : null
     await api.post(`/scores/submit/${assignmentId}`, { overall_comment: overallComment.value, signature_image: sigData })
-    showSnackbar('ส่งผลการประเมินสำเร็จ!', 'success')
+    success('ส่งผลการประเมินสำเร็จ!')
     router.push('/committee/evaluations')
-  } catch(e){ showSnackbar('เกิดข้อผิดพลาด','error') }
-  finally { submitting.value = false }
+  } catch (e) { error() } finally { submitting.value = false }
 }
 </script>

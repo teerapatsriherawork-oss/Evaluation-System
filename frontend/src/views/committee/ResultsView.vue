@@ -27,22 +27,24 @@
       </v-col>
     </v-row>
 
-    <v-card v-if="completed.length===0" class="glass-card pa-10 text-center">
-      <v-icon size="64" color="info" class="mb-3">mdi-clipboard-check-outline</v-icon>
-      <h3 class="text-h5 mb-2">ยังไม่มีผลการประเมิน</h3>
-      <p class="text-medium-emphasis">ยังไม่ได้ส่งผลการประเมินใดเลย</p>
-    </v-card>
+    <EmptyState v-if="completed.length===0" icon="mdi-clipboard-check-outline" color="info"
+      title="ยังไม่มีผลการประเมิน" subtitle="ยังไม่ได้ส่งผลการประเมินใดเลย" />
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { useAuthStore, api } from '../../stores/auth'
-const auth = useAuthStore(); const completed = ref([])
+import { useAuthStore } from '../../stores/auth'
+import { api } from '../../lib/api'
+import EmptyState from '../../components/EmptyState.vue'
+
+const auth = useAuthStore()
+const completed = ref([])
+
 onMounted(async () => {
   try {
-    const { data } = await api.get(`/assignments/committee/${auth.user.id}?all=true`)
-    completed.value = (data.data || []).filter(a => a.status === 'completed')
-  } catch(e){}
+    const rows = (await api.get(`/assignments/committee/${auth.user.id}?all=true`)).data.data || []
+    completed.value = rows.filter(a => a.status === 'completed')
+  } catch (e) { /* noop */ }
 })
 </script>
