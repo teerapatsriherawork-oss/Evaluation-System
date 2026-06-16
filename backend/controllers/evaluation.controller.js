@@ -4,6 +4,7 @@
 const db = require('../config/db');
 const wrap = require('../utils/handler');
 const { ok, created, notFound } = require('../utils/response');
+const { logActivity } = require('../utils/audit');
 
 // ===== Periods =====
 
@@ -31,6 +32,7 @@ exports.create = wrap(async (req, res) => {
      VALUES (?, ?, ?, ?, ?, ?)`,
     [title, description, start_date, end_date, is_active || false, req.user.id]
   );
+  await logActivity(req, 'CREATE', 'evaluation', result.insertId, `สร้างรอบประเมิน "${title}"`);
   created(res, { id: result.insertId, title, start_date, end_date }, 'สร้างรอบการประเมินสำเร็จ');
 });
 
@@ -42,6 +44,7 @@ exports.update = wrap(async (req, res) => {
     [title, description, start_date, end_date, is_active, req.params.id]
   );
   if (!result.affectedRows) return notFound(res, 'ไม่พบรอบการประเมิน');
+  await logActivity(req, 'UPDATE', 'evaluation', req.params.id, `แก้ไขรอบประเมิน "${title}"`);
   ok(res, { id: req.params.id }, 'แก้ไขสำเร็จ');
 });
 
@@ -58,6 +61,7 @@ exports.toggle = wrap(async (req, res) => {
 exports.remove = wrap(async (req, res) => {
   const result = await db.run('DELETE FROM evaluation_periods WHERE id = ?', [req.params.id]);
   if (!result.affectedRows) return notFound(res, 'ไม่พบรอบการประเมิน');
+  await logActivity(req, 'DELETE', 'evaluation', req.params.id, 'ลบรอบประเมิน');
   ok(res, null, 'ลบสำเร็จ');
 });
 
@@ -93,5 +97,6 @@ exports.updateTopic = wrap(async (req, res) => {
 exports.removeTopic = wrap(async (req, res) => {
   const result = await db.run('DELETE FROM evaluation_topics WHERE id = ?', [req.params.id]);
   if (!result.affectedRows) return notFound(res, 'ไม่พบหัวข้อ');
+  await logActivity(req, 'DELETE', 'topic', req.params.id, 'ลบหัวข้อการประเมิน');
   ok(res, null, 'ลบสำเร็จ');
 });

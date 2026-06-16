@@ -20,7 +20,7 @@
               <div class="text-caption text-medium-emphasis">{{ topic.indicators?.length || 0 }} ตัวชี้วัด</div>
             </div>
             <v-btn icon size="small" variant="text" @click.stop="openTopicDialog(topic)" class="mr-1"><v-icon size="small">mdi-pencil</v-icon></v-btn>
-            <v-btn icon size="small" variant="text" color="error" @click.stop="deleteTopic(topic.id)" class="mr-2"><v-icon size="small">mdi-delete</v-icon></v-btn>
+            <v-btn icon size="small" variant="text" color="error" @click.stop="deleteTopic(topic)" class="mr-2"><v-icon size="small">mdi-delete</v-icon></v-btn>
           </div>
         </v-expansion-panel-title>
         <v-expansion-panel-text>
@@ -42,7 +42,7 @@
                 <td><v-chip size="x-small" color="secondary" label>{{ evidenceLabel(ind.evidence_type) }}</v-chip></td>
                 <td>
                   <v-btn icon size="x-small" variant="text" @click="openIndicatorDialog(topic.id, ind)"><v-icon size="small">mdi-pencil</v-icon></v-btn>
-                  <v-btn icon size="x-small" variant="text" color="error" @click="deleteIndicator(ind.id)"><v-icon size="small">mdi-delete</v-icon></v-btn>
+                  <v-btn icon size="x-small" variant="text" color="error" @click="deleteIndicator(ind)"><v-icon size="small">mdi-delete</v-icon></v-btn>
                 </td>
               </tr>
               <tr v-if="!topic.indicators?.length"><td colspan="6" class="text-center text-medium-emphasis py-3">ยังไม่มีตัวชี้วัด</td></tr>
@@ -112,11 +112,13 @@ import { ref, reactive, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { api } from '../../lib/api'
 import { useNotify } from '../../composables/useNotify'
+import { useConfirm } from '../../composables/useConfirm'
 import { DEFAULT_SCORE_LEVELS, parseScoreLevels } from '../../lib/format'
 import EmptyState from '../../components/EmptyState.vue'
 
 const route = useRoute()
 const { success, error } = useNotify()
+const confirm = useConfirm()
 const periodId = route.params.periodId
 const topics = ref([])
 const saving = ref(false)
@@ -165,8 +167,9 @@ const saveTopic = async () => {
     topicDlg.value = false; await fetchTopics(); success('บันทึกสำเร็จ')
   } catch (e) { error() } finally { saving.value = false }
 }
-const deleteTopic = async (id) => {
-  try { await api.delete(`/topics/${id}`); await fetchTopics(); success('ลบสำเร็จ') } catch { error() }
+const deleteTopic = async (topic) => {
+  if (!(await confirm({ title: 'ยืนยันการลบ', message: `ลบหัวข้อ "${topic.title}"?\nตัวชี้วัดในหัวข้อนี้จะถูกลบทั้งหมด` }))) return
+  try { await api.delete(`/topics/${topic.id}`); await fetchTopics(); success('ลบสำเร็จ') } catch { error() }
 }
 
 const openIndicatorDialog = (topicId, ind = null) => {
@@ -190,8 +193,9 @@ const saveIndicator = async () => {
     indDlg.value = false; await fetchTopics(); success('บันทึกสำเร็จ')
   } catch (e) { error() } finally { saving.value = false }
 }
-const deleteIndicator = async (id) => {
-  try { await api.delete(`/indicators/${id}`); await fetchTopics(); success('ลบสำเร็จ') } catch { error() }
+const deleteIndicator = async (ind) => {
+  if (!(await confirm({ message: `ลบตัวชี้วัด "${ind.name}"?` }))) return
+  try { await api.delete(`/indicators/${ind.id}`); await fetchTopics(); success('ลบสำเร็จ') } catch { error() }
 }
 
 onMounted(fetchTopics)

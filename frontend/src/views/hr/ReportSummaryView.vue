@@ -3,9 +3,12 @@
     <h1 class="text-h4 font-weight-bold gradient-text mb-2">สรุปผลการประเมิน</h1>
     <p class="text-body-2 text-medium-emphasis mb-6">แสดงรายงานผลการประเมินรายบุคคล</p>
 
-    <v-row dense class="mb-4">
+    <v-row dense class="mb-4" align="center">
       <v-col cols="12" sm="4">
-        <v-select v-model="periodId" :items="periodItems" label="รอบประเมิน" density="compact" @update:model-value="fetchSummary" />
+        <v-select v-model="periodId" :items="periodItems" label="รอบประเมิน" density="compact" hide-details @update:model-value="fetchSummary" />
+      </v-col>
+      <v-col cols="12" sm="3">
+        <v-btn color="success" variant="tonal" @click="exportExcel" :disabled="!periodId" block><v-icon start>mdi-microsoft-excel</v-icon> Export Excel</v-btn>
       </v-col>
     </v-row>
 
@@ -125,6 +128,7 @@ const viewReport = async (id) => {
 
 // เปิด PDF (cookie แนบไปกับ request อัตโนมัติ) → เบราว์เซอร์ดาวน์โหลดไฟล์
 const downloadPdf = (id) => { if (id) window.open(`/api/reports/pdf/${id}`, '_blank') }
+const exportExcel = () => { if (periodId.value) window.open(`/api/reports/csv/${periodId.value}`, '_blank') }
 
 onMounted(async () => {
   const { data } = await api.get('/evaluations')

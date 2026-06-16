@@ -5,6 +5,7 @@ const db = require('../config/db');
 const wrap = require('../utils/handler');
 const { ok, notFound } = require('../utils/response');
 const { calcWeightedAverage } = require('../utils/score');
+const { logActivity, notify } = require('../utils/audit');
 
 // ===== Self Assessment =====
 
@@ -56,6 +57,15 @@ exports.getProgress = wrap(async (req, res) => {
   const draft = draftRow?.draft || 0;
   const progress = total > 0 ? Math.round((done / total) * 100) : 0;
   ok(res, { total, completed: done, draft, remaining: total - done - draft, progress });
+});
+
+// POST /api/self-assessments/reopen — ผู้รับขอแก้ไขการประเมินตนเองใหม่ (submitted → draft) [เกณฑ์ 5.2.8]
+exports.reopenSelfAssessment = wrap(async (req, res) => {
+  const r = await db.run(
+    "UPDATE self_assessments SET status='draft' WHERE evaluatee_id=? AND status='submitted'",
+    [req.user.id]
+  );
+  ok(res, { reopened: r.affectedRows }, 'เปิดให้แก้ไขการประเมินใหม่แล้ว');
 });
 
 // ===== Committee Scores =====
@@ -111,7 +121,22 @@ exports.submitEvaluation = wrap(async (req, res) => {
     [assignmentId, overall_comment, signature_image, total_score]
   );
   await db.run('UPDATE committee_assignments SET status=? WHERE id=?', ['completed', assignmentId]);
+
+  // แจ้งเตือนผู้รับการประเมิน + บันทึก log
+  const assign = await db.one('SELECT evaluatee_id FROM committee_assignments WHERE id=?', [assignmentId]);
+  if (assign) await notify(assign.evaluatee_id, 'ผลการประเมินใหม่', 'มีกรรมการส่งผลการประเมินของคุณแล้ว', '/evaluatee/feedback');
+  await logActivity(req, 'SUBMIT', 'evaluation', assignmentId, `ส่งผลการประเมิน (คะแนน ${total_score})`);
+
   ok(res, { assignment_id: assignmentId, total_score }, 'ส่งผลการประเมินสำเร็จ');
+});
+
+// POST /api/scores/unsubmit/:assignmentId — ยกเลิกการลงนาม (กรรมการแก้ไขได้อีกครั้ง) [เกณฑ์ 5.3.8]
+exports.unsubmitEvaluation = wrap(async (req, res) => {
+  const id = req.params.assignmentId;
+  const r = await db.run('UPDATE evaluation_results SET is_submitted=FALSE WHERE assignment_id=?', [id]);
+  if (!r.affectedRows) return notFound(res, 'ยังไม่มีการลงนาม');
+  await db.run("UPDATE committee_assignments SET status='in_progress' WHERE id=?", [id]);
+  ok(res, { assignment_id: id }, 'ยกเลิกการลงนามแล้ว — แก้ไขได้อีกครั้ง');
 });
 
 // GET /api/scores/feedback/:evaluateeId — ผลประเมินจากกรรมการ (ผู้รับการประเมินดู)

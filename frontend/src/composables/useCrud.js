@@ -17,6 +17,7 @@ import { api } from '../lib/api'
 export const useCrud = (endpoint, blankForm = {}, options = {}) => {
   const idKey = options.idKey || 'id'
   const notify = inject('showSnackbar')
+  const confirm = inject('confirm')
 
   const items = ref([])
   const loading = ref(false)
@@ -75,13 +76,17 @@ export const useCrud = (endpoint, blankForm = {}, options = {}) => {
     }
   }
 
-  const remove = async (id) => {
+  // remove(id) ลบทันที | remove(id, 'ข้อความ') หรือ remove(id, {opts}) จะถามยืนยันก่อน
+  const remove = async (id, confirmOpts = null) => {
+    if (confirmOpts && confirm && !(await confirm(confirmOpts))) return false
     try {
       await api.delete(`${endpoint}/${id}`)
       notify?.('ลบสำเร็จ')
       await load()
+      return true
     } catch (e) {
       notify?.(e.response?.data?.message || 'ลบไม่สำเร็จ', 'error')
+      return false
     }
   }
 

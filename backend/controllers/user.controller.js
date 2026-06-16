@@ -5,6 +5,7 @@ const bcrypt = require('bcryptjs');
 const db = require('../config/db');
 const wrap = require('../utils/handler');
 const { ok, fail, notFound } = require('../utils/response');
+const { logActivity } = require('../utils/audit');
 
 const USER_COLS = 'id, username, email, full_name, role, phone, department, position, profile_image, created_at';
 
@@ -35,6 +36,7 @@ exports.update = wrap(async (req, res) => {
   const result = await db.update('users', { email, full_name, phone, department, position, role }, 'id=?', [req.params.id]);
   if (result.noFields) return fail(res, 400, 'ไม่มีข้อมูลที่ต้องแก้ไข');
   if (!result.affectedRows) return notFound(res, 'ไม่พบผู้ใช้');
+  await logActivity(req, 'UPDATE', 'user', req.params.id, 'แก้ไขข้อมูลผู้ใช้');
   ok(res, { id: req.params.id }, 'แก้ไขสำเร็จ');
 });
 
@@ -49,6 +51,7 @@ exports.changePassword = wrap(async (req, res) => {
 exports.remove = wrap(async (req, res) => {
   const result = await db.run('DELETE FROM users WHERE id = ?', [req.params.id]);
   if (!result.affectedRows) return notFound(res, 'ไม่พบผู้ใช้');
+  await logActivity(req, 'DELETE', 'user', req.params.id, 'ลบผู้ใช้');
   ok(res, null, 'ลบสำเร็จ');
 });
 
@@ -60,4 +63,16 @@ exports.updateProfile = wrap(async (req, res) => {
     [email, full_name, phone, department, position, req.user.id]
   );
   ok(res, null, 'แก้ไขข้อมูลส่วนตัวสำเร็จ');
+});
+
+// PUT /api/users/me/password — เปลี่ยนรหัสผ่านตนเอง (ต้องยืนยันรหัสเดิมก่อน)
+exports.changeOwnPassword = wrap(async (req, res) => {
+  const { old_password, new_password } = req.body;
+  if (!new_password || new_password.length < 6) return fail(res, 400, 'รหัสผ่านใหม่ต้องมีอย่างน้อย 6 ตัวอักษร');
+  const user = await db.one('SELECT password FROM users WHERE id=?', [req.user.id]);
+  if (!user || !(await bcrypt.compare(old_password || '', user.password))) {
+    return fail(res, 400, 'รหัสผ่านเดิมไม่ถูกต้อง');
+  }
+  await db.run('UPDATE users SET password=? WHERE id=?', [await bcrypt.hash(new_password, 10), req.user.id]);
+  ok(res, null, 'เปลี่ยนรหัสผ่านสำเร็จ');
 });

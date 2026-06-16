@@ -4,6 +4,7 @@
 const db = require('../config/db');
 const wrap = require('../utils/handler');
 const { ok, created, fail, notFound } = require('../utils/response');
+const { logActivity, notify } = require('../utils/audit');
 
 // GET /api/assignments — ดึงการมอบหมายทั้งหมด (?period_id=1)
 exports.getAll = wrap(async (req, res) => {
@@ -29,6 +30,8 @@ exports.create = wrap(async (req, res) => {
       'INSERT INTO committee_assignments (period_id, committee_id, evaluatee_id, committee_role) VALUES (?, ?, ?, ?)',
       [period_id, committee_id, evaluatee_id, committee_role || 'member']
     );
+    await notify(evaluatee_id, 'ได้รับการมอบหมาย', 'มีกรรมการได้รับมอบหมายให้ประเมินคุณ', '/evaluatee/feedback');
+    await logActivity(req, 'CREATE', 'assignment', result.insertId, 'มอบหมายกรรมการให้ผู้รับการประเมิน');
     created(res, { id: result.insertId }, 'มอบหมายกรรมการสำเร็จ');
   } catch (e) {
     if (e.code === 'ER_DUP_ENTRY') return fail(res, 400, 'กรรมการท่านนี้ถูกมอบหมายแล้ว');
@@ -48,6 +51,7 @@ exports.update = wrap(async (req, res) => {
 exports.remove = wrap(async (req, res) => {
   const result = await db.run('DELETE FROM committee_assignments WHERE id = ?', [req.params.id]);
   if (!result.affectedRows) return notFound(res, 'ไม่พบข้อมูล');
+  await logActivity(req, 'DELETE', 'assignment', req.params.id, 'ลบการมอบหมายกรรมการ');
   ok(res, null, 'ลบสำเร็จ');
 });
 

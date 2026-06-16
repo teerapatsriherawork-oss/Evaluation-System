@@ -10,8 +10,12 @@ const assert = require('node:assert');
 
 const BASE = process.env.TEST_API || 'http://localhost:3000/api';
 
+// เช็คว่า server + DB พร้อมจริง (login dummy → 401 = DB query ได้; 500/error = DB ไม่พร้อม → skip)
 const ping = async () => {
-  try { return (await fetch(`${BASE}/health`)).ok; } catch { return false; }
+  try {
+    const r = await jsonPost('/auth/login', { username: '__healthcheck__', password: 'x' });
+    return r.status === 401;
+  } catch { return false; }
 };
 
 const jsonPost = (path, body, cookie) =>

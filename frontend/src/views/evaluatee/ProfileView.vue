@@ -15,6 +15,16 @@
         <v-btn type="submit" class="gradient-btn" :loading="saving" block size="large"><v-icon start>mdi-content-save</v-icon>บันทึกข้อมูล</v-btn>
       </v-form>
     </v-card>
+
+    <!-- เปลี่ยนรหัสผ่าน -->
+    <v-card class="glass-card pa-6 mt-4" max-width="600">
+      <div class="text-h6 font-weight-medium mb-3"><v-icon color="warning" class="mr-2">mdi-lock-reset</v-icon>เปลี่ยนรหัสผ่าน</div>
+      <v-form @submit.prevent="changePassword" ref="pwFormRef">
+        <v-text-field v-model="pw.old_password" label="รหัสผ่านเดิม *" type="password" prepend-inner-icon="mdi-lock" :rules="[req]" class="mb-2" />
+        <v-text-field v-model="pw.new_password" label="รหัสผ่านใหม่ *" type="password" prepend-inner-icon="mdi-lock-plus" :rules="[req, minLen6]" class="mb-3" />
+        <v-btn type="submit" color="warning" variant="tonal" :loading="pwSaving"><v-icon start>mdi-lock-reset</v-icon>เปลี่ยนรหัสผ่าน</v-btn>
+      </v-form>
+    </v-card>
   </div>
 </template>
 
@@ -30,7 +40,21 @@ const saving = ref(false)
 const formRef = ref(null)
 const form = reactive({ full_name: '', email: '', phone: '', department: '', position: '' })
 const req = (v) => !!v || 'กรุณากรอกข้อมูล'
+const minLen6 = (v) => (!!v && v.length >= 6) || 'อย่างน้อย 6 ตัวอักษร'
 const emailRule = (v) => (!v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) || 'รูปแบบอีเมลไม่ถูกต้อง'
+
+// เปลี่ยนรหัสผ่านตนเอง (เกณฑ์ 8.6)
+const pw = reactive({ old_password: '', new_password: '' })
+const pwFormRef = ref(null)
+const pwSaving = ref(false)
+const changePassword = async () => {
+  const { valid } = await pwFormRef.value.validate(); if (!valid) return
+  pwSaving.value = true
+  try {
+    await api.put('/users/me/password', pw)
+    success('เปลี่ยนรหัสผ่านสำเร็จ'); pw.old_password = ''; pw.new_password = ''
+  } catch (e) { error(e.response?.data?.message) } finally { pwSaving.value = false }
+}
 
 onMounted(async () => {
   try { Object.assign(form, (await api.get('/auth/me')).data.data) } catch (e) { /* noop */ }
