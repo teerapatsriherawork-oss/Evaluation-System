@@ -215,3 +215,21 @@ exports.restoreBackup = wrap(async (req, res) => {
 exports.getBackups = wrap(async (req, res) => {
   ok(res, await db.many('SELECT id, backup_name, created_by, created_at FROM system_backups ORDER BY created_at DESC'));
 });
+
+// GET /api/reports/csv/:periodId — ส่งออกผลการประเมินเป็น CSV (เปิดใน Excel ได้)
+exports.exportCsv = wrap(async (req, res) => {
+  const rows = await db.many(
+    `SELECT u.full_name, u.department, AVG(er.total_score) AS avg_score, COUNT(er.id) AS committees
+     FROM evaluation_results er
+     JOIN committee_assignments ca ON er.assignment_id = ca.id
+     JOIN users u ON ca.evaluatee_id = u.id
+     WHERE ca.period_id = ? AND er.is_submitted = TRUE
+     GROUP BY ca.evaluatee_id ORDER BY avg_score DESC`,
+    [req.params.periodId]
+  );
+  const header = 'ชื่อ-สกุล,แผนก,คะแนนเฉลี่ย,จำนวนกรรมการ\n';
+  const body = rows.map(r => `${r.full_name},${r.department || ''},${Number(r.avg_score).toFixed(2)},${r.committees}`).join('\n');
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename="evaluation-report.csv"');
+  res.send('﻿' + header + body);  // ﻿ = BOM ให้ Excel อ่านภาษาไทยถูกต้อง
+});

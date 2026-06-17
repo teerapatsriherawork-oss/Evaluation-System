@@ -9,6 +9,9 @@ router.get('/', auth, authorize('hr'), ctrl.getAll);
 /** PUT /api/users/profile — แก้ไขข้อมูลตนเอง (ต้องอยู่ก่อน /:id) */
 router.put('/profile', auth, ctrl.updateProfile);
 
+/** PUT /api/users/me/password — เปลี่ยนรหัสผ่านตนเอง (ต้องอยู่ก่อน /:id) */
+router.put('/me/password', auth, ctrl.changeOwnPassword);
+
 /** GET /api/users/:id — ดึงข้อมูลผู้ใช้ตาม ID */
 router.get('/:id', auth, ctrl.getById);
 

@@ -36,6 +36,8 @@ app.use('/api/assignments', require('./routes/committee.routes'));
 app.use('/api', require('./routes/score.routes'));
 app.use('/api/upload', require('./routes/upload.routes'));
 app.use('/api/reports', require('./routes/report.routes'));
+app.use('/api/activity-logs', require('./routes/activity.routes'));
+app.use('/api/notifications', require('./routes/notification.routes'));
 
 // ============ Health Check ============
 app.get('/api/health', (req, res) => {

@@ -63,6 +63,18 @@ const routes = [
     component: () => import('../views/hr/StatisticsView.vue'),
     meta: { requiresAuth: true, role: 'hr' }
   },
+  {
+    path: '/hr/activity-logs',
+    name: 'ActivityLogs',
+    component: () => import('../views/hr/ActivityLogView.vue'),
+    meta: { requiresAuth: true, role: 'hr' }
+  },
+  {
+    path: '/hr/backup',
+    name: 'Backup',
+    component: () => import('../views/hr/BackupView.vue'),
+    meta: { requiresAuth: true, role: 'hr' }
+  },
   // ============ Evaluatee Routes ============
   {
     path: '/evaluatee/profile',

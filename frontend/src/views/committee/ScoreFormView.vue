@@ -84,7 +84,10 @@
           </div>
         </div>
         <v-divider class="my-4" />
-        <div class="d-flex justify-end">
+        <div class="d-flex ga-2 justify-end">
+          <v-btn variant="tonal" color="warning" @click="unsubmit" :loading="submitting" rounded="lg">
+            <v-icon start>mdi-pencil</v-icon> ยกเลิกลายเซ็น / แก้ไข
+          </v-btn>
           <v-btn variant="tonal" color="primary" @click="$router.back()" rounded="lg"><v-icon start>mdi-arrow-left</v-icon> กลับ</v-btn>
         </div>
       </template>
@@ -115,11 +118,13 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '../../lib/api'
 import { useNotify } from '../../composables/useNotify'
+import { useConfirm } from '../../composables/useConfirm'
 import { parseScoreLevels } from '../../lib/format'
 
 const route = useRoute()
 const router = useRouter()
 const { success, error } = useNotify()
+const confirm = useConfirm()
 const assignmentId = route.params.assignmentId
 const items = ref([])
 const scores = reactive({})
@@ -128,6 +133,7 @@ const submitting = ref(false)
 const signCanvas = ref(null)
 const isCompleted = ref(false)
 const savedSignature = ref(null)
+const hasSigned = ref(false)
 let drawing = false
 let ctx = null
 
@@ -195,17 +201,36 @@ const draw = (e) => {
   if (!drawing) return
   const c = ensureCtx(); if (!c) return
   c.lineTo(...pos(e)); c.stroke()
+  hasSigned.value = true
 }
 const endDraw = () => { drawing = false }
-const clearSignature = () => { const c = ensureCtx(); if (c) c.clearRect(0, 0, signCanvas.value.width, signCanvas.value.height) }
+const clearSignature = () => { const c = ensureCtx(); if (c) c.clearRect(0, 0, signCanvas.value.width, signCanvas.value.height); hasSigned.value = false }
 
 const submitEvaluation = async () => {
+  // ต้องให้คะแนนครบทุกตัวชี้วัด + ลงลายเซ็นก่อนส่ง
+  const missing = items.value.filter(i => scores[i.indicator_id]?.score == null)
+  if (missing.length) return error(`กรุณาให้คะแนนให้ครบทุกตัวชี้วัด (ขาดอีก ${missing.length} รายการ)`)
+  if (!hasSigned.value) return error('กรุณาลงลายเซ็นก่อนส่งผลการประเมิน')
+  if (!(await confirm({ title: 'ยืนยันส่งผลการประเมิน', message: 'เมื่อส่งแล้วสถานะจะเป็น "เสร็จสิ้น"\n(ยังยกเลิกลายเซ็นเพื่อแก้ไขภายหลังได้)', color: 'success', confirmText: 'ส่งผล', icon: 'mdi-send-check' }))) return
   submitting.value = true
   try {
     const sigData = signCanvas.value ? signCanvas.value.toDataURL() : null
     await api.post(`/scores/submit/${assignmentId}`, { overall_comment: overallComment.value, signature_image: sigData })
     success('ส่งผลการประเมินสำเร็จ!')
     router.push('/committee/evaluations')
+  } catch (e) { error() } finally { submitting.value = false }
+}
+
+// ยกเลิกการลงนาม → กลับมาแก้ไขได้ (เกณฑ์ 5.3.8)
+const unsubmit = async () => {
+  if (!(await confirm({ title: 'ยกเลิกการลงนาม', message: 'ผลการประเมินจะกลับมาแก้ไขได้อีกครั้ง', color: 'warning', confirmText: 'ยกเลิกลายเซ็น' }))) return
+  submitting.value = true
+  try {
+    await api.post(`/scores/unsubmit/${assignmentId}`)
+    success('ยกเลิกการลงนามแล้ว — กรุณาตรวจคะแนนและลงลายเซ็นใหม่ก่อนส่ง')
+    isCompleted.value = false
+    savedSignature.value = null
+    hasSigned.value = false
   } catch (e) { error() } finally { submitting.value = false }
 }
 </script>

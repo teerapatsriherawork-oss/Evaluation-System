@@ -23,7 +23,7 @@
             <td><v-chip size="x-small" :color="a.committee_role==='chairman'?'warning':'info'" label>{{ a.committee_role==='chairman'?'ประธาน':'กรรมการ' }}</v-chip></td>
             <td>{{ a.period_title }}</td>
             <td><StatusChip :status="a.status" /></td>
-            <td><v-btn icon size="x-small" color="error" variant="text" @click="remove(a.id)"><v-icon size="small">mdi-delete</v-icon></v-btn></td>
+            <td><v-btn icon size="x-small" color="error" variant="text" @click="remove(a.id, { message: `ลบการมอบหมาย: ${a.committee_name} ประเมิน ${a.evaluatee_name}?` })"><v-icon size="small">mdi-delete</v-icon></v-btn></td>
           </tr>
           <tr v-if="items.length===0"><td colspan="6" class="text-center text-medium-emphasis py-4">ไม่พบข้อมูล</td></tr>
         </tbody>
