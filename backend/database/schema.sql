@@ -121,7 +121,6 @@ CREATE TABLE IF NOT EXISTS evaluation_results (
   is_submitted BOOLEAN DEFAULT FALSE,
   submitted_at TIMESTAMP NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE KEY unique_result (assignment_id),  -- 1 assignment = 1 result (ให้ ON DUPLICATE KEY UPDATE ทำงาน)
   FOREIGN KEY (assignment_id) REFERENCES committee_assignments(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
@@ -146,31 +145,6 @@ CREATE TABLE IF NOT EXISTS system_backups (
   created_by INT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
-) ENGINE=InnoDB;
-
--- 11. activity_logs — บันทึกประวัติการใช้งาน (Audit trail)
-CREATE TABLE IF NOT EXISTS activity_logs (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  user_id INT,
-  action VARCHAR(50) NOT NULL,
-  entity VARCHAR(50),
-  entity_id INT,
-  detail TEXT,
-  ip VARCHAR(45),
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
-) ENGINE=InnoDB;
-
--- 12. notifications — การแจ้งเตือนผู้ใช้
-CREATE TABLE IF NOT EXISTS notifications (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  user_id INT NOT NULL,
-  title VARCHAR(255),
-  message TEXT,
-  link VARCHAR(255),
-  is_read BOOLEAN DEFAULT FALSE,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
 -- ============================================================

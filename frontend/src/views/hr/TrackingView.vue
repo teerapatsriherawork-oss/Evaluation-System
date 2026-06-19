@@ -12,7 +12,7 @@
           <v-table density="compact" class="bg-transparent">
             <thead><tr><th>กรรมการ</th><th>บทบาท</th><th>สถานะ</th><th>เสร็จ/ทั้งหมด</th></tr></thead>
             <tbody>
-              <tr v-for="(c, i) in tracking.committee_tracking" :key="i">
+              <tr v-for="c in tracking.committee_tracking" :key="c.committee_name">
                 <td>{{ c.committee_name }}</td>
                 <td><v-chip size="x-small" :color="c.committee_role==='chairman'?'warning':'info'" label>{{ c.committee_role==='chairman'?'ประธาน':'สมาชิก' }}</v-chip></td>
                 <td><StatusChip :status="c.status" /></td>
@@ -29,7 +29,7 @@
           <v-table density="compact" class="bg-transparent">
             <thead><tr><th>ชื่อ</th><th>กรอกแล้ว</th><th>ส่งแล้ว</th><th>ทั้งหมด</th><th>ความคืบหน้า</th></tr></thead>
             <tbody>
-              <tr v-for="(e, i) in tracking.evaluatee_tracking" :key="i">
+              <tr v-for="e in tracking.evaluatee_tracking" :key="e.evaluatee_name">
                 <td>{{ e.evaluatee_name }}</td><td>{{ e.self_filled }}</td><td>{{ e.self_submitted }}</td><td>{{ e.total_indicators }}</td>
                 <td><v-progress-linear :model-value="e.total_indicators ? (e.self_submitted/e.total_indicators)*100 : 0" color="secondary" height="8" rounded /></td>
               </tr>

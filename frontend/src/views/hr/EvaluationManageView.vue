@@ -35,7 +35,7 @@
               {{ p.is_active ? 'ปิด' : 'เปิด' }}
             </v-btn>
             <v-btn size="small" variant="tonal" @click="edit(p)" rounded="lg" icon="mdi-pencil" />
-            <v-btn size="small" color="error" variant="tonal" @click="confirmDelete(p)" rounded="lg" icon="mdi-delete" />
+            <v-btn size="small" color="error" variant="tonal" @click="askDelete(p)" rounded="lg" icon="mdi-delete" />
           </div>
         </v-card>
       </v-col>
@@ -68,6 +68,7 @@
       </v-card>
     </v-dialog>
 
+    <ConfirmDialog v-model="confirmDlg" :message="`คุณแน่ใจหรือไม่ที่จะลบ ${target?.title}?`" :loading="saving" @confirm="doDelete" />
   </div>
 </template>
 
@@ -77,33 +78,24 @@ import { useCrud } from '../../composables/useCrud'
 import { useNotify } from '../../composables/useNotify'
 import { api } from '../../lib/api'
 import { formatDate } from '../../lib/format'
-import { useConfirm } from '../../composables/useConfirm'
 import EmptyState from '../../components/EmptyState.vue'
+import ConfirmDialog from '../../components/ConfirmDialog.vue'
 
 const req = (v) => !!v || 'กรุณากรอกข้อมูล'
 const { items, loading, saving, dialog, form, isEdit, load, openCreate, openEdit, save, remove } =
   useCrud('/evaluations', { title: '', description: '', start_date: '', end_date: '', is_active: false })
-const { success, error } = useNotify()
-const confirm = useConfirm()
+const { error } = useNotify()
 const formRef = ref(null)
+const confirmDlg = ref(false)
+const target = ref(null)
 
 // แปลงวันที่ ISO → YYYY-MM-DD ให้ input type=date ตอนแก้ไข
 const edit = (p) => openEdit({ ...p, start_date: p.start_date?.split('T')[0], end_date: p.end_date?.split('T')[0] })
 const togglePeriod = async (p) => {
-  const act = p.is_active ? 'ปิด' : 'เปิด'
-  const ok = await confirm({
-    title: `${act}รอบประเมิน`,
-    message: `ต้องการ${act}รอบ "${p.title}"?${p.is_active ? '\nผู้ใช้จะไม่สามารถประเมินได้ชั่วคราว' : '\nผู้ใช้จะเริ่มประเมินได้ทันที'}`,
-    color: p.is_active ? 'warning' : 'success', confirmText: act, icon: p.is_active ? 'mdi-pause' : 'mdi-play'
-  })
-  if (!ok) return
-  try { await api.patch(`/evaluations/${p.id}/toggle`); await load(); success(`${act}รอบประเมินแล้ว`) } catch { error() }
+  try { await api.patch(`/evaluations/${p.id}/toggle`); await load() } catch { error() }
 }
-// ลบ → ถามยืนยันผ่าน global confirm (useCrud.remove จัดการให้)
-const confirmDelete = (p) => remove(p.id, {
-  title: 'ยืนยันการลบ',
-  message: `ลบรอบประเมิน "${p.title}"?\nหัวข้อ ตัวชี้วัด และข้อมูลที่เกี่ยวข้องจะถูกลบทั้งหมด`
-})
+const askDelete = (p) => { target.value = p; confirmDlg.value = true }
+const doDelete = async () => { await remove(target.value.id); confirmDlg.value = false }
 
 load()
 </script>

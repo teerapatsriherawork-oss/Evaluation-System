@@ -15,9 +15,6 @@ router.get('/self-assessments/:evaluateeId', auth, ctrl.getSelfAssessments);
 /** POST /api/self-assessments — สร้าง/อัพเดท self-assessment */
 router.post('/self-assessments', auth, authorize('evaluatee'), selfAssessmentRules, validate, ctrl.upsertSelfAssessment);
 
-/** POST /api/self-assessments/reopen — ขอรับการประเมินใหม่ (5.2.8) */
-router.post('/self-assessments/reopen', auth, authorize('evaluatee'), ctrl.reopenSelfAssessment);
-
 // ============ Committee Scores ============
 
 /** GET /api/scores/assignment/:assignmentId — ดึงคะแนนของ assignment */
@@ -34,8 +31,5 @@ router.post('/scores', auth, authorize('committee'), scoreRules, validate, ctrl.
 
 /** POST /api/scores/submit/:assignmentId — ยืนยันส่งผลการประเมิน */
 router.post('/scores/submit/:assignmentId', auth, authorize('committee'), ctrl.submitEvaluation);
-
-/** POST /api/scores/unsubmit/:assignmentId — ยกเลิกการลงนาม (5.3.8) */
-router.post('/scores/unsubmit/:assignmentId', auth, authorize('committee'), ctrl.unsubmitEvaluation);
 
 module.exports = router;

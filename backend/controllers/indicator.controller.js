@@ -4,7 +4,6 @@
 const db = require('../config/db');
 const wrap = require('../utils/handler');
 const { ok, created, notFound } = require('../utils/response');
-const { logActivity } = require('../utils/audit');
 
 // GET /api/topics/:topicId/indicators
 exports.getByTopic = wrap(async (req, res) => {
@@ -44,7 +43,6 @@ exports.update = wrap(async (req, res) => {
 exports.remove = wrap(async (req, res) => {
   const result = await db.run('DELETE FROM indicators WHERE id = ?', [req.params.id]);
   if (!result.affectedRows) return notFound(res, 'ไม่พบตัวชี้วัด');
-  await logActivity(req, 'DELETE', 'indicator', req.params.id, 'ลบตัวชี้วัด');
   ok(res, null, 'ลบสำเร็จ');
 });
 

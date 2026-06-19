@@ -18,21 +18,18 @@
       <v-table density="comfortable" class="bg-transparent">
         <thead><tr><th>ชื่อ-สกุล</th><th>ชื่อผู้ใช้</th><th>อีเมล</th><th>แผนก</th><th>ตำแหน่ง</th><th>บทบาท</th><th width="100">จัดการ</th></tr></thead>
         <tbody>
-          <tr v-for="u in paged" :key="u.id">
+          <tr v-for="u in filtered" :key="u.id">
             <td>{{ u.full_name }}</td><td>{{ u.username }}</td><td>{{ u.email || '-' }}</td>
             <td>{{ u.department || '-' }}</td><td>{{ u.position || '-' }}</td>
             <td><v-chip size="x-small" :color="roleColor(u.role)" label>{{ roleLabel(u.role) }}</v-chip></td>
             <td>
               <v-btn icon size="x-small" variant="text" @click="openEdit(u)"><v-icon size="small">mdi-pencil</v-icon></v-btn>
-              <v-btn icon size="x-small" variant="text" color="error" @click="confirmDeleteUser(u)"><v-icon size="small">mdi-delete</v-icon></v-btn>
+              <v-btn icon size="x-small" variant="text" color="error" @click="remove(u.id)"><v-icon size="small">mdi-delete</v-icon></v-btn>
             </td>
           </tr>
           <tr v-if="filtered.length===0"><td colspan="7" class="text-center text-medium-emphasis py-4">ไม่พบข้อมูล</td></tr>
         </tbody>
       </v-table>
-      <div class="d-flex justify-center pa-3" v-if="pageCount > 1">
-        <v-pagination v-model="page" :length="pageCount" density="compact" total-visible="5" />
-      </div>
     </v-card>
 
     <v-dialog v-model="dialog" max-width="500" persistent>
@@ -89,13 +86,8 @@ const filtered = computed(() => {
   }
   return list
 })
-const page = ref(1)
-const perPage = 10
-const pageCount = computed(() => Math.ceil(filtered.value.length / perPage))
-const paged = computed(() => filtered.value.slice((page.value - 1) * perPage, page.value * perPage))
 
 const add = () => openCreate({ role: tab.value })
-const confirmDeleteUser = (u) => remove(u.id, { message: `ลบผู้ใช้ "${u.full_name}"?` })
 
 // save แบบ custom: สร้าง = /auth/register, แก้ไข = /users/:id (+ เปลี่ยนรหัสถ้ากรอก)
 const saveUser = async () => {

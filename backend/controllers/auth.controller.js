@@ -7,7 +7,6 @@ const jwt = require('jsonwebtoken');
 const db = require('../config/db');
 const wrap = require('../utils/handler');
 const { ok, created, fail, notFound } = require('../utils/response');
-const { logActivity } = require('../utils/audit');
 
 // POST /api/auth/register — ลงทะเบียนผู้ใช้ใหม่
 exports.register = wrap(async (req, res) => {
@@ -46,9 +45,6 @@ exports.login = wrap(async (req, res) => {
     sameSite: 'lax',
     maxAge: parseInt(process.env.COOKIE_MAX_AGE) || 86400000
   });
-
-  req.user = { id: user.id, role: user.role };  // ให้ logActivity รู้ว่าใครล็อกอิน
-  await logActivity(req, 'LOGIN', 'auth', user.id, `เข้าสู่ระบบ (${user.username})`);
 
   ok(res, {
     id: user.id, username: user.username, full_name: user.full_name,

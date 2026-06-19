@@ -1,15 +1,7 @@
 <template>
   <div>
-    <div class="d-flex align-center mb-6">
-      <div>
-        <h1 class="text-h4 font-weight-bold gradient-text">ประเมินตนเอง</h1>
-        <p class="text-body-2 text-medium-emphasis mt-1">เพิ่มข้อมูล หลักฐาน และกรอกคะแนนประเมินตนเองในแต่ละตัวชี้วัด</p>
-      </div>
-      <v-spacer />
-      <v-btn v-if="hasSubmitted" color="warning" variant="tonal" @click="reopen" rounded="lg">
-        <v-icon start>mdi-refresh</v-icon> ขอประเมินใหม่
-      </v-btn>
-    </div>
+    <h1 class="text-h4 font-weight-bold gradient-text mb-2">ประเมินตนเอง</h1>
+    <p class="text-body-2 text-medium-emphasis mb-6">เพิ่มข้อมูล หลักฐาน และกรอกคะแนนประเมินตนเองในแต่ละตัวชี้วัด</p>
 
     <v-expansion-panels variant="accordion">
       <v-expansion-panel v-for="(group, topicTitle) in groupedIndicators" :key="topicTitle" class="glass-card mb-3" rounded="xl">
@@ -85,13 +77,11 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { useAuthStore } from '../../stores/auth'
 import { api } from '../../lib/api'
 import { useNotify } from '../../composables/useNotify'
-import { useConfirm } from '../../composables/useConfirm'
 import { parseScoreLevels } from '../../lib/format'
 import EmptyState from '../../components/EmptyState.vue'
 
 const auth = useAuthStore()
 const { success, error } = useNotify()
-const confirm = useConfirm()
 const loading = ref(false)
 const indicators = ref([])
 const assessments = reactive({})
@@ -106,16 +96,8 @@ const groupedIndicators = computed(() => {
 })
 
 const completedCount = (group) => group.filter(ind => assessments[ind.id]?.status === 'submitted').length
-const hasSubmitted = computed(() => indicators.value.some(i => assessments[i.id]?.status === 'submitted'))
 // คำอธิบายระดับ 1-4 ที่ HR กำหนดไว้ในตัวชี้วัด (หรือค่า default)
 const levelsOf = (ind) => parseScoreLevels(ind.score_levels)
-
-// ขอประเมินใหม่ — เปิดให้แก้ไข self-assessment ที่ส่งแล้ว (เกณฑ์ 5.2.8)
-const reopen = async () => {
-  if (!(await confirm({ title: 'ขอประเมินใหม่', message: 'รายการที่ส่งแล้วจะกลับเป็นแบบร่างให้แก้ไขได้', color: 'warning', confirmText: 'ขอประเมินใหม่' }))) return
-  try { await api.post('/self-assessments/reopen'); success('เปิดให้แก้ไขการประเมินใหม่แล้ว'); await fetchData() }
-  catch (e) { error() }
-}
 
 const fetchData = async () => {
   loading.value = true
@@ -147,13 +129,11 @@ const uploadEvidence = async (indId) => {
   try {
     const { data } = await api.post('/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
     assessments[indId].evidence_file = data.data.file_path
-    assessments[indId]._file = null
     success('อัปโหลดสำเร็จ')
   } catch (e) { error('อัปโหลดล้มเหลว') }
 }
 
 const saveAssessment = async (indId, status) => {
-  if (status === 'submitted' && assessments[indId].self_score == null) return error('กรุณาให้คะแนนประเมินตนเองก่อนส่ง')
   assessments[indId]._saving = true
   try {
     const a = assessments[indId]

@@ -3,10 +3,7 @@
     <h1 class="text-h4 font-weight-bold gradient-text mb-2">สถิติภาพรวม</h1>
     <p class="text-body-2 text-medium-emphasis mb-6">สรุปสถิติภาพรวมจากข้อมูลการประเมิน เช่น ค่าเฉลี่ยคะแนน</p>
 
-    <div class="d-flex align-center ga-2 mb-4" style="max-width:560px">
-      <v-select v-model="periodId" :items="periodItems" label="รอบประเมิน" density="compact" hide-details @update:model-value="fetchStats" />
-      <v-btn color="success" variant="tonal" @click="exportExcel" :disabled="!periodId"><v-icon start>mdi-microsoft-excel</v-icon> Excel</v-btn>
-    </div>
+    <v-select v-model="periodId" :items="periodItems" label="รอบประเมิน" density="compact" class="mb-4" style="max-width:400px" @update:model-value="fetchStats" />
 
     <v-row>
       <v-col cols="12" md="7">
@@ -76,9 +73,6 @@ const renderCharts = () => {
     })
   }
 }
-
-// ส่งออกผลเป็น Excel/CSV (เปิด endpoint ตรง — cookie แนบอัตโนมัติ)
-const exportExcel = () => { if (periodId.value) window.open(`/api/reports/csv/${periodId.value}`, '_blank') }
 
 const fetchStats = async () => {
   if (!periodId.value) return
